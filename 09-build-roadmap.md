@@ -23,6 +23,75 @@ Get these working first, in order:
 
 ---
 
+## Detailed Build Order
+
+### 1. Scaffold the project
+
+- Create the Next.js frontend, Laravel API, PostgreSQL database, and Docker Compose setup.
+- Add basic environment files, local run commands, and a health-check endpoint.
+- Exit criteria: both frontend and API run locally, and the API can connect to the database.
+
+### 2. Prove PGN parsing
+
+- Add a minimal PGN paste/input flow.
+- Use `chess.js` to parse one real game and produce move-by-move FEN positions.
+- Exit criteria: a real PGN can be parsed without manual cleanup, and each move position can be inspected.
+
+### 3. Prove Stockfish integration
+
+- Add a server-side Stockfish wrapper using UCI stdin/stdout.
+- Analyse one FEN and return best move plus evaluation.
+- Exit criteria: the API can submit a FEN and receive a reliable Stockfish result.
+
+### 4. Analyse a full game
+
+- Run Stockfish across every position from the parsed PGN.
+- Calculate evaluation changes and centipawn loss per move.
+- Exit criteria: one full game produces stored move evaluations.
+
+### 5. Select key moments
+
+- Identify the 3 most important mistakes from the analysed game.
+- Store played move, best move, FEN, evaluation swing, and classification.
+- Exit criteria: the app can consistently produce 3 useful review moments from a real game.
+
+### 6. Add mistake tags
+
+- Implement the first MVP heuristic tags from the taxonomy.
+- Allow tags to be manually corrected later.
+- Exit criteria: each key moment has an initial tag and enough data to explain why it was chosen.
+
+### 7. Generate explanations
+
+- Create the LLM prompt using deterministic board data, engine line, played move, best move, and tag.
+- Keep temperature low and cache results.
+- Exit criteria: each key moment gets a plain-English explanation that is useful to a club player.
+
+### 8. Build the analysis UI
+
+- Add the minimum page for reviewing a game: board, move context, played move, best move, tag, and explanation.
+- Include loading, failed-analysis, and empty states.
+- Exit criteria: a user can paste a PGN and review the 3 key moments without developer help.
+
+### 9. Add accounts and persistence
+
+- Add authentication, user-owned games, saved key moments, notes, and coach agreement toggle.
+- Exit criteria: a returning user can see previous analysed games and update their notes.
+
+### 10. Add trends and dashboard
+
+- Compute mistake frequency, accuracy trend, recent games, and simple study recommendation.
+- Keep charts minimal until the core analysis loop feels strong.
+- Exit criteria: the dashboard gives a useful next action after several analysed games.
+
+### 11. Polish and deploy
+
+- Improve responsive layout, error handling, README setup, and deployment configuration.
+- Deploy a public demo with safe sample data.
+- Exit criteria: the app is usable from a public URL and documented well enough to run locally.
+
+---
+
 ## MVP Milestones
 
 | # | Milestone | Deliverable |

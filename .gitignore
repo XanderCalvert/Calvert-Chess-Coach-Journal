@@ -1,0 +1,83 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Environment (keep *.example files)
+.env
+.env.*
+!.env.example
+
+# Node / JS
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build / cache artifacts
+dist/
+build/
+coverage/
+.cache/
+.turbo/
+*.tsbuildinfo
+
+# Python (apps/engine, scripts)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Laravel API app
+apps/api/vendor/
+apps/api/node_modules/
+apps/api/bootstrap/cache/*
+!apps/api/bootstrap/cache/.gitignore
+apps/api/storage/*.key
+apps/api/storage/logs/*
+!apps/api/storage/logs/.gitignore
+apps/api/storage/framework/cache/*
+!apps/api/storage/framework/cache/.gitignore
+apps/api/storage/framework/sessions/*
+!apps/api/storage/framework/sessions/.gitignore
+apps/api/storage/framework/views/*
+!apps/api/storage/framework/views/.gitignore
+apps/api/public/build/
+apps/api/public/hot
+apps/api/.phpunit.result.cache
+
+# Scribe — generated output (regenerated on deploy via `php artisan scribe:generate`)
+# .scribe/ source files ARE committed (intro/auth markdown stubs + endpoint cache)
+apps/api/resources/views/scribe/
+apps/api/public/vendor/scribe/
+apps/api/storage/app/private/scribe/
+
+# Next.js web app
+apps/web/.next/
+apps/web/out/
+apps/web/.vercel/
+apps/web/.swc/
+
+# Logs & temp
+*.log
+tmp/
+temp/
+
+# Local databases
+*.sqlite
+*.sqlite3
+
+# Docker / local overrides
+docker-compose.override.yml

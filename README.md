@@ -22,7 +22,80 @@ Not a Chess.com/Lichess-style platform: no live play, matchmaking, or social lay
 
 ## Repository status
 
-This repository currently holds **planning and design documentation**. Application code, local setup, and run commands will be added as implementation proceeds; [09-build-roadmap.md](./09-build-roadmap.md) describes the intended build order.
+This repository currently holds **planning documentation plus an initial app/infra skeleton**. Laravel and Next.js application code will be scaffolded into `apps/api` and `apps/web` as implementation proceeds; [09-build-roadmap.md](./09-build-roadmap.md) describes the intended build order.
+
+## Local structure
+
+```text
+apps/
+  api/        # Laravel API, queues, Stockfish integration for MVP
+  web/        # Next.js frontend
+  engine/     # Future dedicated Stockfish worker
+infra/
+  docker/     # Dockerfiles for local services
+  postgres/   # Optional PostgreSQL init scripts
+```
+
+## Local containers
+
+The local setup is Herd-first for Laravel and Docker-backed for supporting services. The starter Compose setup uses unique names and ports so it can run alongside other local projects:
+
+| Service | Container | Local URL / port |
+|---------|-----------|------------------|
+| Web | `chess-coach-web` | `http://calvertchess.test` or `http://localhost:3001` |
+| API | `chess-coach-api` | `http://api.calvertchess.test` or `http://localhost:8081` |
+| PostgreSQL | `chess-coach-db` | `localhost:5433` |
+| Redis | `chess-coach-redis` | `localhost:6380` |
+
+The intended analysis flow is:
+
+```text
+web -> api -> queue/job -> engine
+```
+
+The web app should never call Stockfish directly. Laravel owns game import, persistence, and queueing. The optional `engine` service is behind the `engine` Compose profile; it currently proves Stockfish can run, then idles until queue integration is added.
+
+Link the Laravel API with Herd:
+
+```sh
+cd apps/api
+herd link api.calvertchess
+```
+
+Run the normal Docker stack for frontend, PostgreSQL, and Redis:
+
+```sh
+docker compose up
+```
+
+Run with the future engine worker:
+
+```sh
+docker compose --profile engine up
+```
+
+Run the API container instead of Herd, if needed:
+
+```sh
+docker compose --profile docker-api up
+```
+
+For the `.test` domains, point these hostnames at your local machine through Herd, a reverse proxy, or your hosts file:
+
+```text
+127.0.0.1 calvertchess.test
+127.0.0.1 api.calvertchess.test
+```
+
+If using a local PostgreSQL server managed through pgAdmin instead of the Docker `db` service, Laravel expects:
+
+```env
+DB_HOST=127.0.0.1
+DB_PORT=5432
+DB_DATABASE=calvert_chess_coach_journal
+DB_USERNAME=postgres
+DB_PASSWORD=<your local Postgres password>
+```
 
 ## Documentation
 
