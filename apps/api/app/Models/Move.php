@@ -5,13 +5,14 @@ namespace App\Models;
 use App\Enums\MoveClassification;
 use App\Enums\PlayerColour;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Move extends Model
 {
-    use HasUuids;
+    use HasUuids, HasFactory;
 
     public $timestamps = false;
 
