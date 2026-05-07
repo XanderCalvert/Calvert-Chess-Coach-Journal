@@ -1,0 +1,687 @@
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  .page {
+    background: #0f0d0b;
+    color: #e8e0d0;
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  .nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.25rem 2rem;
+    border-bottom: 0.5px solid rgba(232,224,208,0.12);
+    position: sticky;
+    top: 0;
+    background: rgba(15,13,11,0.92);
+    backdrop-filter: blur(8px);
+    z-index: 100;
+  }
+
+  .logo {
+    font-family: 'Playfair Display', serif;
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    color: #e8e0d0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .logo-glyph {
+    font-size: 20px;
+  }
+
+  .nav-links {
+    display: flex;
+    gap: 1.5rem;
+    align-items: center;
+    list-style: none;
+  }
+
+  .nav-links a {
+    font-size: 13px;
+    color: rgba(232,224,208,0.55);
+    text-decoration: none;
+    letter-spacing: 0.03em;
+    transition: color 0.2s;
+  }
+  .nav-links a:hover { color: #e8e0d0; }
+
+  .btn-primary {
+    background: #c9a84c;
+    color: #0f0d0b;
+    padding: 8px 18px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 500;
+    text-decoration: none;
+    letter-spacing: 0.02em;
+    transition: background 0.2s;
+    cursor: pointer;
+    border: none;
+  }
+  .btn-primary:hover { background: #d4b55e; }
+
+  .hero {
+    padding: 5rem 2rem 3rem;
+    max-width: 860px;
+    margin: 0 auto;
+  }
+
+  .hero-eyebrow {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: #c9a84c;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .eyebrow-line {
+    width: 28px;
+    height: 0.5px;
+    background: #c9a84c;
+    opacity: 0.6;
+  }
+
+  .hero h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(36px, 6vw, 58px);
+    font-weight: 600;
+    line-height: 1.12;
+    color: #f0e8d8;
+    margin-bottom: 1.5rem;
+  }
+
+  .hero h1 em {
+    font-style: italic;
+    color: #c9a84c;
+  }
+
+  .hero-sub {
+    font-size: 16px;
+    color: rgba(232,224,208,0.6);
+    line-height: 1.7;
+    max-width: 520px;
+    margin-bottom: 2.5rem;
+    font-weight: 300;
+  }
+
+  .hero-actions {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .btn-ghost {
+    border: 0.5px solid rgba(232,224,208,0.25);
+    background: transparent;
+    color: rgba(232,224,208,0.7);
+    padding: 9px 18px;
+    border-radius: 4px;
+    font-size: 13px;
+    text-decoration: none;
+    transition: all 0.2s;
+    cursor: pointer;
+  }
+  .btn-ghost:hover {
+    border-color: rgba(232,224,208,0.5);
+    color: #e8e0d0;
+  }
+
+  .hero-stat {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: rgba(232,224,208,0.35);
+    letter-spacing: 0.08em;
+    margin-left: 8px;
+    padding-left: 16px;
+    border-left: 0.5px solid rgba(232,224,208,0.15);
+  }
+
+  .board-preview {
+    margin: 3rem auto 0;
+    max-width: 860px;
+    padding: 0 2rem;
+  }
+
+  .analysis-card {
+    background: #181510;
+    border: 0.5px solid rgba(232,224,208,0.1);
+    border-radius: 8px;
+    overflow: hidden;
+    display: grid;
+    grid-template-columns: auto 1fr;
+  }
+
+  .board-grid {
+    display: grid;
+    grid-template-columns: repeat(8, 36px);
+    grid-template-rows: repeat(8, 36px);
+    border-right: 0.5px solid rgba(232,224,208,0.08);
+    flex-shrink: 0;
+  }
+
+  .sq {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    user-select: none;
+    position: relative;
+  }
+  .sq.light { background: #2a231a; }
+  .sq.dark  { background: #1a1410; }
+  .sq.highlight-played { background: rgba(220,60,60,0.25); }
+  .sq.highlight-best   { background: rgba(80,200,120,0.2); }
+
+  .arrow-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  .analysis-panel {
+    padding: 1.25rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .panel-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    color: rgba(232,224,208,0.3);
+    text-transform: uppercase;
+  }
+
+  .mistake-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(220,60,60,0.15);
+    border: 0.5px solid rgba(220,60,60,0.3);
+    color: #e07070;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 3px;
+    letter-spacing: 0.05em;
+    width: fit-content;
+  }
+
+  .cp-loss {
+    color: rgba(232,224,208,0.35);
+    font-size: 11px;
+    margin-left: 4px;
+  }
+
+  .explanation {
+    font-size: 13px;
+    color: rgba(232,224,208,0.7);
+    line-height: 1.65;
+    font-weight: 300;
+  }
+
+  .explanation strong {
+    color: #c9a84c;
+    font-weight: 500;
+  }
+
+  .move-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .move-chip {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    padding: 3px 8px;
+    border-radius: 3px;
+  }
+  .move-chip.played {
+    background: rgba(220,60,60,0.12);
+    color: #d07070;
+    border: 0.5px solid rgba(220,60,60,0.2);
+  }
+  .move-chip.best {
+    background: rgba(80,200,120,0.1);
+    color: #70c090;
+    border: 0.5px solid rgba(80,200,120,0.2);
+  }
+  .move-label {
+    font-size: 11px;
+    color: rgba(232,224,208,0.3);
+  }
+
+  .divider {
+    height: 0.5px;
+    background: rgba(232,224,208,0.08);
+  }
+
+  .features {
+    max-width: 860px;
+    margin: 4rem auto;
+    padding: 0 2rem;
+  }
+
+  .section-heading {
+    font-family: 'Playfair Display', serif;
+    font-size: 11px;
+    font-style: italic;
+    color: rgba(232,224,208,0.3);
+    letter-spacing: 0.1em;
+    margin-bottom: 2.5rem;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .section-heading::after {
+    content: '';
+    flex: 1;
+    height: 0.5px;
+    background: rgba(232,224,208,0.1);
+  }
+
+  .pillars {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: rgba(232,224,208,0.08);
+    border: 0.5px solid rgba(232,224,208,0.08);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .pillar {
+    background: #0f0d0b;
+    padding: 1.75rem 1.5rem;
+  }
+
+  .pillar-num {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: #c9a84c;
+    letter-spacing: 0.1em;
+    margin-bottom: 1rem;
+    opacity: 0.7;
+  }
+
+  .pillar h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 17px;
+    font-weight: 600;
+    color: #f0e8d8;
+    margin-bottom: 0.6rem;
+    line-height: 1.25;
+  }
+
+  .pillar p {
+    font-size: 13px;
+    color: rgba(232,224,208,0.5);
+    line-height: 1.65;
+    font-weight: 300;
+  }
+
+  .trend-section {
+    max-width: 860px;
+    margin: 0 auto 4rem;
+    padding: 0 2rem;
+  }
+
+  .trend-card {
+    background: #181510;
+    border: 0.5px solid rgba(232,224,208,0.1);
+    border-radius: 8px;
+    padding: 1.5rem;
+  }
+
+  .trend-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1.25rem;
+  }
+
+  .trend-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 15px;
+    color: #e8e0d0;
+    margin-bottom: 3px;
+  }
+  .trend-sub {
+    font-size: 12px;
+    color: rgba(232,224,208,0.35);
+    font-family: 'DM Mono', monospace;
+    letter-spacing: 0.05em;
+  }
+
+  .accuracy-badge {
+    font-family: 'DM Mono', monospace;
+    font-size: 22px;
+    font-weight: 500;
+    color: #c9a84c;
+  }
+  .accuracy-label {
+    font-size: 10px;
+    color: rgba(232,224,208,0.3);
+    letter-spacing: 0.08em;
+    text-align: right;
+  }
+
+  .sparkline-wrap {
+    height: 60px;
+    position: relative;
+  }
+
+  .mistake-pills {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 0.5px solid rgba(232,224,208,0.08);
+  }
+
+  .tag-pill {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    letter-spacing: 0.04em;
+    border: 0.5px solid;
+  }
+  .tag-high { background: rgba(220,60,60,0.1); color: #d07070; border-color: rgba(220,60,60,0.2); }
+  .tag-med  { background: rgba(201,168,76,0.1); color: #c9a84c; border-color: rgba(201,168,76,0.2); }
+  .tag-low  { background: rgba(232,224,208,0.06); color: rgba(232,224,208,0.4); border-color: rgba(232,224,208,0.12); }
+
+  .cta-strip {
+    max-width: 860px;
+    margin: 0 auto 4rem;
+    padding: 0 2rem;
+  }
+
+  .cta-box {
+    border: 0.5px solid rgba(201,168,76,0.25);
+    border-radius: 6px;
+    padding: 2.5rem 2rem;
+    text-align: center;
+    background: rgba(201,168,76,0.04);
+  }
+
+  .cta-box h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 22px;
+    color: #f0e8d8;
+    margin-bottom: 0.5rem;
+  }
+  .cta-box p {
+    font-size: 13px;
+    color: rgba(232,224,208,0.45);
+    font-weight: 300;
+    margin-bottom: 1.5rem;
+    line-height: 1.6;
+  }
+
+  .footer {
+    border-top: 0.5px solid rgba(232,224,208,0.08);
+    padding: 1.5rem 2rem;
+    max-width: 860px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .footer-logo {
+    font-family: 'Playfair Display', serif;
+    font-size: 13px;
+    color: rgba(232,224,208,0.3);
+  }
+
+  .footer-note {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: rgba(232,224,208,0.2);
+    letter-spacing: 0.08em;
+  }
+
+  .animate-in {
+    opacity: 0;
+    transform: translateY(12px);
+    animation: fadeUp 0.5s ease forwards;
+  }
+  .delay-1 { animation-delay: 0.1s; }
+  .delay-2 { animation-delay: 0.2s; }
+  .delay-3 { animation-delay: 0.3s; }
+  .delay-4 { animation-delay: 0.4s; }
+
+  @keyframes fadeUp {
+    to { opacity: 1; transform: translateY(0); }
+  }
+</style>
+
+<div class="page">
+
+  <nav class="nav">
+    <div class="logo">
+      <span class="logo-glyph">♟</span> Chess Coach Journal
+    </div>
+    <ul class="nav-links">
+      <li><a href="#">Features</a></li>
+      <li><a href="#">How it works</a></li>
+      <li><a href="#">GitHub</a></li>
+      <li><button class="btn-primary">Import a game</button></li>
+    </ul>
+  </nav>
+
+  <section class="hero animate-in">
+    <div class="hero-eyebrow">
+      <span class="eyebrow-line"></span>
+      Post-game analysis · Plain English
+    </div>
+    <h1>Understand why<br>your moves <em>fail.</em></h1>
+    <p class="hero-sub">
+      Chess Coach Journal analyses your games with Stockfish, then explains your key mistakes in plain English — not centipawn scores. Track patterns. Study smarter.
+    </p>
+    <div class="hero-actions">
+      <button class="btn-primary" onclick="sendPrompt('Show me how to import my first PGN')">Paste a PGN →</button>
+      <button class="btn-ghost">See a sample analysis</button>
+      <span class="hero-stat">600–1400 Elo · MVP</span>
+    </div>
+  </section>
+
+  <div class="board-preview animate-in delay-2">
+    <div class="analysis-card">
+      <div class="board-grid" id="board"></div>
+      <div class="analysis-panel">
+        <span class="panel-label">Key moment · Move 24 · Middlegame</span>
+        <div>
+          <div class="mistake-badge">⚠ Blunder <span class="cp-loss">−187 cp</span></div>
+        </div>
+        <div class="move-row">
+          <span class="move-label">Played</span>
+          <span class="move-chip played">Nxd5</span>
+          <span class="move-label" style="margin-left:8px">Best</span>
+          <span class="move-chip best">Rf1</span>
+        </div>
+        <div class="divider"></div>
+        <p class="explanation">
+          Playing <strong>Nxd5</strong> won a pawn but left the f2 square completely undefended. Black's rook on f8 could immediately capture on f2, forking your king and winning material back with interest. The engine suggests <strong>Rf1</strong> first — defending the weakness before going pawn-hunting. In chess, king safety takes priority over material gain.
+        </p>
+        <div style="display:flex; gap:6px; margin-top:4px">
+          <span class="tag-pill tag-high">Hanging piece</span>
+          <span class="tag-pill tag-low">Add club note</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <section class="features animate-in delay-3">
+    <div class="section-heading">Three pillars</div>
+    <div class="pillars">
+      <div class="pillar">
+        <div class="pillar-num">01</div>
+        <h3>Explain, not evaluate</h3>
+        <p>Engine scores translated into the language of chess ideas — threats, principles, and patterns — not just numbers.</p>
+      </div>
+      <div class="pillar">
+        <div class="pillar-num">02</div>
+        <h3>Remember, not report</h3>
+        <p>Mistakes are tracked across every game. See that you keep missing back-rank tactics before your coach does.</p>
+      </div>
+      <div class="pillar">
+        <div class="pillar-num">03</div>
+        <h3>Human feedback loop</h3>
+        <p>Record your chess club coach's notes alongside engine analysis. Mark where they agree — and where they don't.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="trend-section animate-in delay-4">
+    <div class="section-heading">Trends over time</div>
+    <div class="trend-card">
+      <div class="trend-header">
+        <div>
+          <div class="trend-title">Accuracy · Last 10 games</div>
+          <div class="trend-sub">As White · Club + Online</div>
+        </div>
+        <div style="text-align:right">
+          <div class="accuracy-badge">74%</div>
+          <div class="accuracy-label">avg accuracy</div>
+        </div>
+      </div>
+      <div class="sparkline-wrap">
+        <canvas id="sparkline" width="780" height="60"></canvas>
+      </div>
+      <div class="mistake-pills">
+        <span style="font-size:11px; color:rgba(232,224,208,0.3); font-family:'DM Mono',monospace; letter-spacing:0.06em; margin-right:4px">Top tags ·</span>
+        <span class="tag-pill tag-high">Hanging piece ×7</span>
+        <span class="tag-pill tag-med">King safety ×4</span>
+        <span class="tag-pill tag-med">Missed capture ×3</span>
+        <span class="tag-pill tag-low">Poor development ×2</span>
+        <span class="tag-pill tag-low">Bad trade ×1</span>
+      </div>
+    </div>
+  </section>
+
+  <div class="cta-strip">
+    <div class="cta-box">
+      <h2>Start with a real game</h2>
+      <p>Paste any PGN and receive a full analysis — three key moments,<br>plain-English explanations, and mistake tags — within a minute.</p>
+      <button class="btn-primary" onclick="sendPrompt('How do I export a PGN from Chess.com?')">Import your first game ↗</button>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <span class="footer-logo">♟ Chess Coach Journal</span>
+    <span class="footer-note">Open source · Portfolio project · v1.0</span>
+  </footer>
+
+</div>
+
+<script>
+const PIECES = {
+  wK:'♔', wQ:'♕', wR:'♖', wB:'♗', wN:'♘', wP:'♙',
+  bK:'♚', bQ:'♛', bR:'♜', bB:'♝', bN:'♞', bP:'♟'
+};
+
+const position = [
+  ['bR','bN','bB','bQ','bK','bB',null,'bR'],
+  ['bP','bP','bP',null,null,'bP','bP','bP'],
+  [null,null,null,null,'bP',null,null,null],
+  [null,null,null,'bP',null,null,null,null],
+  [null,null,null,null,'wP',null,null,null],
+  [null,null,'wN',null,null,'wN',null,null],
+  ['wP','wP','wP','wP',null,'wP','wP','wP'],
+  ['wR',null,'wB','wQ','wK','wB',null,'wR']
+];
+
+const highlights = {
+  played: [[5,2]],
+  best:   [[7,5]]
+};
+
+const board = document.getElementById('board');
+for (let r = 0; r < 8; r++) {
+  for (let c = 0; c < 8; c++) {
+    const sq = document.createElement('div');
+    const isLight = (r + c) % 2 === 0;
+    sq.className = 'sq ' + (isLight ? 'light' : 'dark');
+
+    const isPlayed = highlights.played.some(([pr,pc]) => pr===r && pc===c);
+    const isBest   = highlights.best.some(([pr,pc]) => pr===r && pc===c);
+    if (isPlayed) sq.classList.add('highlight-played');
+    if (isBest)   sq.classList.add('highlight-best');
+
+    const piece = position[r][c];
+    if (piece) {
+      sq.textContent = PIECES[piece];
+      sq.style.textShadow = piece[0]==='w'
+        ? '0 1px 2px rgba(0,0,0,0.6)'
+        : '0 1px 2px rgba(0,0,0,0.8)';
+      if (piece[0]==='b') sq.style.filter='brightness(0.75)';
+    }
+    board.appendChild(sq);
+  }
+}
+
+const canvas = document.getElementById('sparkline');
+const ctx = canvas.getContext('2d');
+canvas.width = canvas.parentElement.offsetWidth || 780;
+canvas.height = 60;
+
+const data = [62, 58, 71, 69, 75, 72, 78, 73, 80, 74];
+const W = canvas.width, H = 60;
+const pad = 12;
+const xs = data.map((_, i) => pad + (i / (data.length - 1)) * (W - pad * 2));
+const minV = 50, maxV = 90;
+const ys = data.map(v => H - pad - ((v - minV) / (maxV - minV)) * (H - pad * 2));
+
+const grad = ctx.createLinearGradient(0, 0, 0, H);
+grad.addColorStop(0, 'rgba(201,168,76,0.15)');
+grad.addColorStop(1, 'rgba(201,168,76,0)');
+
+ctx.beginPath();
+ctx.moveTo(xs[0], ys[0]);
+for (let i = 1; i < xs.length; i++) {
+  const mx = (xs[i - 1] + xs[i]) / 2;
+  ctx.bezierCurveTo(mx, ys[i - 1], mx, ys[i], xs[i], ys[i]);
+}
+ctx.lineTo(xs[xs.length - 1], H);
+ctx.lineTo(xs[0], H);
+ctx.closePath();
+ctx.fillStyle = grad;
+ctx.fill();
+
+ctx.beginPath();
+ctx.moveTo(xs[0], ys[0]);
+for (let i = 1; i < xs.length; i++) {
+  const mx = (xs[i - 1] + xs[i]) / 2;
+  ctx.bezierCurveTo(mx, ys[i - 1], mx, ys[i], xs[i], ys[i]);
+}
+ctx.strokeStyle = 'rgba(201,168,76,0.6)';
+ctx.lineWidth = 1.5;
+ctx.stroke();
+
+data.forEach((v, i) => {
+  ctx.beginPath();
+  ctx.arc(xs[i], ys[i], 3, 0, Math.PI * 2);
+  ctx.fillStyle = '#c9a84c';
+  ctx.fill();
+});
+</script>

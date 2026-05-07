@@ -42,7 +42,7 @@ The local setup is Herd-first for Laravel and Docker-backed for supporting servi
 
 | Service | Container | Local URL / port |
 |---------|-----------|------------------|
-| Web | `chess-coach-web` | `http://calvertchess.test` or `http://localhost:3001` |
+| Web | `chess-coach-web` | `http://localhost:3000` with local npm, or `http://localhost:3001` with Docker |
 | API | `chess-coach-api` | `http://api.calvertchess.test` or `http://localhost:8081` |
 | PostgreSQL | `chess-coach-db` | `localhost:5433` |
 | Redis | `chess-coach-redis` | `localhost:6380` |
@@ -80,10 +80,9 @@ Run the API container instead of Herd, if needed:
 docker compose --profile docker-api up
 ```
 
-For the `.test` domains, point these hostnames at your local machine through Herd, a reverse proxy, or your hosts file:
+For the API `.test` domain, point this hostname at your local machine through Herd or your hosts file:
 
 ```text
-127.0.0.1 calvertchess.test
 127.0.0.1 api.calvertchess.test
 ```
 
