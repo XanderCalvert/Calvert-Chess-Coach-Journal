@@ -76,6 +76,17 @@ Seeds a development user, submits a representative PGN-derived payload, and vali
 
 ---
 
+## Feature — connected account listing
+
+**File:** [`Feature/ConnectedAccountListTest.php`](Feature/ConnectedAccountListTest.php)
+
+| Test | What it verifies |
+|------|------------------|
+| `test_returns_paginated_payload_with_empty_data_when_no_accounts` | List endpoint returns a stable paginated contract with empty `data` and correct `meta` defaults. |
+| `test_returns_accounts_ordered_by_platform_then_username` | Accounts are returned in deterministic order (`platform`, then `username`). |
+
+---
+
 ## Feature — analysis job behavior and command wiring
 
 **Files:** [`Feature/AnalyseGameJobTest.php`](Feature/AnalyseGameJobTest.php), [`Feature/AnalyseGameCommandTest.php`](Feature/AnalyseGameCommandTest.php)
