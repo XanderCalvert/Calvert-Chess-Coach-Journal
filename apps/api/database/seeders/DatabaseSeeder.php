@@ -15,10 +15,18 @@ class DatabaseSeeder extends Seeder
         if (! App::isProduction()) {
             $this->call(DevUserSeeder::class);
 
-            User::factory()->create([
-                'display_name' => 'Test User',
-                'email'        => 'test@example.com',
-            ]);
+            User::updateOrCreate(
+                ['email' => 'test@example.com'],
+                [
+                    'display_name' => 'Test User',
+                    'password' => 'password',
+                ]
+            );
+
+            $localOnlySeeder = 'Database\\Seeders\\LocalOnlySeeder';
+            if (class_exists($localOnlySeeder)) {
+                $this->call($localOnlySeeder);
+            }
         }
     }
 }

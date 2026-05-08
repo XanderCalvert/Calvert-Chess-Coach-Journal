@@ -11,15 +11,13 @@ class DevUserSeeder extends Seeder
 
     public function run(): void
     {
-        if (User::find(self::UUID)) {
-            return;
-        }
-
-        $user = new User();
-        $user->id = self::UUID;
-        $user->email = 'dev@local';
-        $user->password = 'password'; // cast to hashed by model
-        $user->display_name = 'Dev User';
-        $user->save();
+        User::updateOrCreate(
+            ['id' => self::UUID],
+            [
+                'email' => 'dev@local',
+                'password' => 'password', // cast to hashed by model
+                'display_name' => 'Dev User',
+            ]
+        );
     }
 }

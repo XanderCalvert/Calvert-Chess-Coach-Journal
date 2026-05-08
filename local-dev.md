@@ -3,7 +3,7 @@
 This project currently runs with:
 
 - Laravel API served by Herd at `http://api.calvertchess.test`
-- Next.js frontend served by `npm run dev` at `http://localhost:3000`
+- Next.js frontend served by `npm run dev` (preferred URL: `http://web.calvertchess.test`)
 - PostgreSQL running locally and managed through pgAdmin 4
 - Optional Docker services for Redis, Docker Postgres, and the future engine worker
 
@@ -19,7 +19,12 @@ The API should already be linked as:
 http://api.calvertchess.test
 ```
 
-Do not proxy the frontend through Herd. Keep `calvertchess.test` unused unless a reverse proxy is added deliberately later.
+Add local hosts entries so both app domains resolve:
+
+```text
+127.0.0.1 web.calvertchess.test
+127.0.0.1 api.calvertchess.test
+```
 
 ### 2. Start PostgreSQL
 
@@ -51,7 +56,7 @@ npm run dev
 Then open:
 
 ```text
-http://localhost:3000
+http://web.calvertchess.test
 ```
 
 ### 4. Check the Laravel API
