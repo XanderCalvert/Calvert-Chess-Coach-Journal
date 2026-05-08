@@ -29,7 +29,6 @@ interface ProfileGame {
   opening_name: string
   move_count: number
   analysis_status: 'pending' | 'running' | 'complete' | 'failed'
-  accuracy_pct: string | null
   blunder_count: number | null
   mistake_count: number | null
   inaccuracy_count: number | null
@@ -59,6 +58,13 @@ const STATUS_STYLES: Record<string, { label: string; color: string }> = {
   failed:   { label: 'Failed',     color: '#f87171' },
 }
 
+const SYNC_STATUS_STYLES: Record<string, { label: string; color: string }> = {
+  never_synced: { label: 'Never synced', color: 'var(--text-faint)' },
+  syncing:      { label: 'Syncing…',     color: 'var(--gold)' },
+  synced:       { label: 'Synced',       color: '#4ade80' },
+  failed:       { label: 'Sync failed',  color: '#f87171' },
+}
+
 function RatingStat({ label, value }: { label: string; value: number | null }) {
   return (
     <div className="text-center px-5 py-4 rounded" style={{ background: 'var(--surface)', border: '1px solid rgba(232,224,208,0.10)' }}>
@@ -81,21 +87,14 @@ function TrendStat({ label, value }: { label: string; value: string }) {
 
 function computeTrends(games: ProfileGame[]) {
   const analysed = games.filter(g => g.analysis_status === 'complete')
-  if (analysed.length === 0) return { avgCpl: null, avgBlunders: null }
+  if (analysed.length === 0) return { avgBlunders: null }
 
-  const withAccuracy = analysed.filter(g => g.accuracy_pct != null)
   const withBlunders = analysed.filter(g => g.blunder_count != null)
-
-  // accuracy → avg CPL approximation is unavailable client-side; show "—" and rely on Phase 3
   const avgBlunders = withBlunders.length > 0
     ? (withBlunders.reduce((s, g) => s + (g.blunder_count ?? 0), 0) / withBlunders.length).toFixed(1)
     : null
 
-  const avgAccuracy = withAccuracy.length > 0
-    ? (withAccuracy.reduce((s, g) => s + parseFloat(g.accuracy_pct ?? '0'), 0) / withAccuracy.length).toFixed(1)
-    : null
-
-  return { avgCpl: avgAccuracy, avgBlunders }
+  return { avgBlunders }
 }
 
 export default function ProfilePage() {
@@ -110,6 +109,11 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true)
   const [gamesLoading, setGamesLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [gamesTrigger, setGamesTrigger] = useState(0)
+
+  // Sync state
+  const [syncing, setSyncing] = useState(false)
+  const [syncError, setSyncError] = useState<string | null>(null)
 
   // Form state (shown when notFound)
   const [formUsername, setFormUsername] = useState(username ?? '')
@@ -136,6 +140,28 @@ export default function ProfilePage() {
       .finally(() => setLoading(false))
   }, [username])
 
+  // Poll sync status while syncing
+  useEffect(() => {
+    if (account?.sync_status !== 'syncing') return
+
+    const id = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/connected-accounts/chesscom/${username}`)
+        if (!res.ok) return
+        const updated: ConnectedAccount = await res.json()
+        setAccount(updated)
+        if (updated.sync_status === 'synced' || updated.sync_status === 'failed') {
+          clearInterval(id)
+          setGamesTrigger(n => n + 1)
+        }
+      } catch {
+        // ignore transient errors during polling
+      }
+    }, 3000)
+
+    return () => clearInterval(id)
+  }, [account?.sync_status, username])
+
   useEffect(() => {
     if (!account) return
     setGamesLoading(true)
@@ -148,7 +174,26 @@ export default function ProfilePage() {
         setMeta(d.meta ?? null)
       })
       .finally(() => setGamesLoading(false))
-  }, [account, page, username])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [account?.id, page, gamesTrigger])
+
+  async function handleSync() {
+    setSyncing(true)
+    setSyncError(null)
+    try {
+      const res = await fetch(`/api/connected-accounts/chesscom/${username}/sync`, { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok && res.status !== 409) {
+        setSyncError(data?.error ?? data?.message ?? `Sync failed (${res.status})`)
+        return
+      }
+      setAccount(data)
+    } catch (err) {
+      setSyncError(err instanceof Error ? err.message : 'Network error')
+    } finally {
+      setSyncing(false)
+    }
+  }
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
@@ -174,10 +219,16 @@ export default function ProfilePage() {
     }
   }
 
-  const { avgCpl, avgBlunders } = computeTrends(games)
+  const { avgBlunders } = computeTrends(games)
   const lastSynced = account?.last_synced_at
     ? new Date(account.last_synced_at).toLocaleString()
-    : 'Never'
+    : null
+
+  const syncStatusStyle = account
+    ? (SYNC_STATUS_STYLES[account.sync_status] ?? SYNC_STATUS_STYLES.never_synced)
+    : null
+
+  const isSyncing = account?.sync_status === 'syncing' || syncing
 
   if (loading) {
     return (
@@ -250,12 +301,33 @@ export default function ProfilePage() {
       <Nav />
       <main className="flex-1 px-6 py-12 max-w-5xl mx-auto w-full">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-semibold mb-1" style={{ fontFamily: 'var(--font-playfair)', color: 'var(--text)' }}>
-            {account.username}
-          </h1>
-          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Chess.com</p>
+        <div className="flex items-start justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-semibold mb-1" style={{ fontFamily: 'var(--font-playfair)', color: 'var(--text)' }}>
+              {account.username}
+            </h1>
+            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Chess.com</p>
+          </div>
+          <button
+            onClick={handleSync}
+            disabled={isSyncing}
+            className="px-5 py-2 rounded text-sm font-medium"
+            style={{
+              background: 'var(--gold)',
+              color: 'var(--bg)',
+              opacity: isSyncing ? 0.6 : 1,
+              cursor: isSyncing ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {isSyncing ? 'Syncing…' : 'Sync Now'}
+          </button>
         </div>
+
+        {syncError && (
+          <div className="mb-4 p-3 rounded text-sm" style={{ background: 'rgba(220,60,60,0.1)', border: '1px solid rgba(220,60,60,0.3)', color: '#f87171' }}>
+            {syncError}
+          </div>
+        )}
 
         {/* Rating stats */}
         <div className="grid grid-cols-4 gap-3 mb-6">
@@ -266,14 +338,18 @@ export default function ProfilePage() {
         </div>
 
         {/* Meta row */}
-        <div className="flex gap-6 mb-6 text-sm" style={{ color: 'var(--text-muted)' }}>
+        <div className="flex flex-wrap gap-x-6 gap-y-1 mb-6 text-sm" style={{ color: 'var(--text-muted)' }}>
           <span><strong style={{ color: 'var(--text)' }}>{meta?.total ?? 0}</strong> games imported</span>
-          <span>Last synced: <strong style={{ color: 'var(--text)' }}>{lastSynced}</strong></span>
+          {lastSynced && (
+            <span>Last synced: <strong style={{ color: 'var(--text)' }}>{lastSynced}</strong></span>
+          )}
+          {syncStatusStyle && (
+            <span style={{ color: syncStatusStyle.color }}>{syncStatusStyle.label}</span>
+          )}
         </div>
 
         {/* Trend cards */}
-        <div className="grid grid-cols-2 gap-3 mb-8 max-w-xs">
-          <TrendStat label="Avg accuracy" value={avgCpl != null ? `${avgCpl}%` : '—'} />
+        <div className="grid grid-cols-1 gap-3 mb-8 max-w-xs">
           <TrendStat label="Blunders/game" value={avgBlunders ?? '—'} />
         </div>
 
@@ -282,7 +358,7 @@ export default function ProfilePage() {
           <p style={{ color: 'var(--text-muted)' }}>Loading games…</p>
         ) : games.length === 0 ? (
           <div className="p-8 rounded text-center" style={{ background: 'var(--surface)', border: '1px solid rgba(232,224,208,0.10)' }}>
-            <p style={{ color: 'var(--text-muted)' }}>No games imported yet for this account.</p>
+            <p style={{ color: 'var(--text-muted)' }}>No games imported yet. Press Sync Now to fetch your latest games.</p>
           </div>
         ) : (
           <>
@@ -290,7 +366,7 @@ export default function ProfilePage() {
               <table className="w-full text-sm" style={{ borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: 'var(--surface)', borderBottom: '1px solid rgba(232,224,208,0.10)' }}>
-                    {['Result', 'Opponent', 'Time control', 'Accuracy', 'Status', ''].map(h => (
+                    {['Result', 'Opponent', 'Time control', 'Blunders', 'Status', ''].map(h => (
                       <th
                         key={h}
                         className="text-left px-4 py-3 text-xs uppercase tracking-wider"
@@ -323,8 +399,8 @@ export default function ProfilePage() {
                         <td className="px-4 py-3" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-dm-mono)', fontSize: '12px' }}>
                           {g.time_control ?? '—'}
                         </td>
-                        <td className="px-4 py-3 font-medium" style={{ color: 'var(--gold)', fontFamily: 'var(--font-dm-mono)' }}>
-                          {g.accuracy_pct != null ? `${g.accuracy_pct}%` : '—'}
+                        <td className="px-4 py-3 font-medium" style={{ color: g.blunder_count != null && g.blunder_count > 0 ? '#f87171' : 'var(--text-muted)', fontFamily: 'var(--font-dm-mono)' }}>
+                          {g.blunder_count ?? (g.analysis_status === 'complete' ? '0' : '—')}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           <span className="text-xs" style={{ color: status.color }}>{status.label}</span>

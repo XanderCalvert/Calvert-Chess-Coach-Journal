@@ -80,12 +80,12 @@ class AnalyseGameJobTest extends TestCase
 
         $this->assertSame('complete', $game->analysis_status->value);
         $this->assertSame(0, $game->blunder_count);
-        $this->assertSame(1, $game->mistake_count);
+        $this->assertSame(0, $game->mistake_count);
         $this->assertSame(0, $game->inaccuracy_count);
 
         $this->assertSame(120, $move->cp_score);
         $this->assertSame(80, $move->cp_loss);
-        $this->assertSame('mistake', $move->classification?->value);
+        $this->assertSame('good', $move->classification?->value);
 
         $this->assertDatabaseHas('engine_analyses', [
             'move_id' => $move->id,

@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Enums\Platform;
+use App\Enums\SyncStatus;
+use App\Jobs\SyncChessComAccountJob;
 use App\Models\ConnectedAccount;
 use App\Models\Game;
 use Illuminate\Http\JsonResponse;
@@ -94,6 +96,22 @@ class ConnectedAccountController extends Controller
                 'total'        => $games->total(),
             ],
         ]);
+    }
+
+    public function sync(string $platform, string $username): JsonResponse
+    {
+        $account = ConnectedAccount::where('platform', $platform)
+            ->where('normalised_username', strtolower($username))
+            ->firstOrFail();
+
+        if ($account->sync_status === SyncStatus::Syncing) {
+            return response()->json($this->formatAccount($account), 409);
+        }
+
+        SyncChessComAccountJob::dispatch($account->id);
+        $account->update(['sync_status' => SyncStatus::Syncing->value]);
+
+        return response()->json($this->formatAccount($account->fresh()), 202);
     }
 
     private function formatAccount(ConnectedAccount $account): array

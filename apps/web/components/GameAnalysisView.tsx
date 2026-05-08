@@ -44,6 +44,7 @@ export interface GameAnalysis {
   inaccuracy_count: number | null
   user_colour: 'white' | 'black' | null
   share_code: string | null
+  source_url?: string | null
   moves: Move[]
 }
 
@@ -236,6 +237,18 @@ export default function GameAnalysisView({ game, initialPly, onPlyChange }: Prop
           {game.opening_name || '—'}{game.eco_code ? ` · ${game.eco_code}` : ''}{game.played_at ? ` · ${game.played_at}` : ''}
           {' · '}{RESULT_LABEL[game.result] ?? game.result}
         </p>
+        {game.source_url && (
+          <p className="text-sm mt-2">
+            <a
+              href={game.source_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: 'var(--gold)', textDecoration: 'underline' }}
+            >
+              View on Chess.com
+            </a>
+          </p>
+        )}
       </div>
 
       {/* Share buttons */}

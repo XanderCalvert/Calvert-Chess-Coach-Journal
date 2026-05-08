@@ -13,5 +13,6 @@ Route::prefix('v1')->group(function () {
     Route::get('/connected-accounts', [ConnectedAccountController::class, 'index']);
     Route::post('/connected-accounts', [ConnectedAccountController::class, 'store']);
     Route::get('/connected-accounts/by-username/{platform}/{username}/games', [ConnectedAccountController::class, 'gamesByUsername']);
+    Route::post('/connected-accounts/by-username/{platform}/{username}/sync', [ConnectedAccountController::class, 'sync']);
     Route::get('/connected-accounts/by-username/{platform}/{username}', [ConnectedAccountController::class, 'showByUsername']);
 });

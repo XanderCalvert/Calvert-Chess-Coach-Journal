@@ -138,6 +138,7 @@ class GameController extends Controller
             'inaccuracy_count' => $game->inaccuracy_count,
             'user_colour'      => $game->user_colour?->value,
             'share_code'       => $game->share_code,
+            'source_url'       => $this->extractExternalGameUrl($game),
             'moves'            => $game->moves->map(fn (Move $m) => [
                 'id'             => $m->id,
                 'move_number'    => $m->move_number,
@@ -151,5 +152,20 @@ class GameController extends Controller
                 'classification' => $m->classification?->value,
             ]),
         ];
+    }
+
+    private function extractExternalGameUrl(Game $game): ?string
+    {
+        if ($game->imported_from !== ImportSource::ChessCom) {
+            return null;
+        }
+
+        if (! preg_match('/\[(Link|Site)\s+"([^"]+)"\]/i', $game->pgn_raw, $matches)) {
+            return null;
+        }
+
+        $url = trim($matches[2]);
+
+        return str_contains(strtolower($url), 'chess.com') ? $url : null;
     }
 }

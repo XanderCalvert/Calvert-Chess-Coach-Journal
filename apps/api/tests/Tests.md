@@ -71,6 +71,7 @@ Seeds a development user, submits a representative PGN-derived payload, and vali
 | `test_show_returns_expected_contract_and_moves_ordered_by_move_number` | Game detail endpoint returns the full game/move payload contract and deterministic move ordering. |
 | `test_show_returns_404_for_unknown_uuid` | Unknown game ID returns `404`. |
 | `test_show_by_share_code_returns_same_game` | Share-code route resolves to the expected game payload. |
+| `test_show_by_share_code_includes_chess_com_source_url_when_present` | Chess.com-imported games expose a source URL for linking back to the original game page. |
 | `test_show_by_share_code_returns_404_when_not_found` | Unknown share code returns `404`. |
 | `test_share_code_lookup_is_case_sensitive` | Share-code lookup behavior is documented as exact-match (case-sensitive). |
 
@@ -89,14 +90,17 @@ Seeds a development user, submits a representative PGN-derived payload, and vali
 
 ## Feature — analysis job behavior and command wiring
 
-**Files:** [`Feature/AnalyseGameJobTest.php`](Feature/AnalyseGameJobTest.php), [`Feature/AnalyseGameCommandTest.php`](Feature/AnalyseGameCommandTest.php)
+**Files:** [`Feature/AnalyseGameJobTest.php`](Feature/AnalyseGameJobTest.php), [`Feature/AnalyseGameCommandTest.php`](Feature/AnalyseGameCommandTest.php), [`Feature/ReanalyseGamesCommandTest.php`](Feature/ReanalyseGamesCommandTest.php)
 
 | Test | What it verifies |
 |------|------------------|
-| `test_job_sets_game_complete_and_updates_move_and_engine_analysis` | Job writes move-level analysis (`cp_score`, `cp_loss`, `classification`) and game summary counters/status, and upserts engine analysis rows. |
+| `test_job_sets_game_complete_and_updates_move_and_engine_analysis` | Job writes move-level analysis (`cp_score`, `cp_loss`, `classification`), computes bounded ACPL-style accuracy, updates user-colour summary counters/status, and upserts engine analysis rows. |
 | `test_job_skips_complete_games_unless_forced` | Job exits early for already-complete games when not forced. |
 | `test_failed_marks_game_as_failed` | Job `failed()` hook marks game analysis status as failed. |
 | `test_command_dispatches_sync_analysis_job` | `chess:analyse` command dispatches `AnalyseGameJob` synchronously with expected arguments. |
+| `test_command_requires_scope_option` | `chess:reanalyse` requires explicit scope (`--all` or `--game_id`) to avoid accidental full reruns. |
+| `test_command_dispatches_sync_force_jobs_for_specific_game_ids` | `chess:reanalyse --game_id=...` dispatches forced sync analysis for each unique requested game ID. |
+| `test_command_with_all_dispatches_for_every_game` | `chess:reanalyse --all` dispatches forced sync analysis for every game in the database. |
 
 ---
 
