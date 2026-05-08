@@ -12,7 +12,7 @@ Get these working first, in order:
 
 - [x] **1.** Project scaffolding: Next.js app, Laravel API, PostgreSQL schema, Docker Compose
 - [x] **2.** chess.js integration — confirm PGN parsing works end-to-end
-- [ ] **3.** Stockfish integration — spawn process, send a FEN, receive a best move
+- [x] **3.** Stockfish integration — spawn process, send a FEN, receive a best move
 - [ ] **4.** Basic auth — register, login, JWT session
 - [ ] **5.** Confirm the full pipeline works manually **before any UI polish**
 
@@ -39,15 +39,15 @@ Get these working first, in order:
 
 ### 2. Prove PGN parsing
 
-- [ ] Add a minimal PGN paste/input flow.
-- [ ] Use `chess.js` to parse one real game and produce move-by-move FEN positions.
-- [ ] Exit criteria: a real PGN can be parsed without manual cleanup, and each move position can be inspected.
+- [x] Add a minimal PGN paste/input flow.
+- [x] Use `chess.js` to parse one real game and produce move-by-move FEN positions.
+- [x] Exit criteria: a real PGN can be parsed without manual cleanup, and each move position can be inspected.
 
 ### 3. Prove Stockfish integration
 
-- [ ] Add a server-side Stockfish wrapper using UCI stdin/stdout.
-- [ ] Analyse one FEN and return best move plus evaluation.
-- [ ] Exit criteria: the API can submit a FEN and receive a reliable Stockfish result.
+- [x] Add a server-side Stockfish wrapper using UCI stdin/stdout.
+- [x] Analyse one FEN and return best move plus evaluation.
+- [x] Exit criteria: the API can submit a FEN and receive a reliable Stockfish result.
 
 ### 4. Analyse a full game
 

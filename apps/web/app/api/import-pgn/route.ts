@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
 
   let laravelResponse: Response
   try {
-    laravelResponse = await fetch(`${laravelUrl}/api/games`, {
+    laravelResponse = await fetch(`${laravelUrl}/api/v1/games`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify(tolaravelPayload(pgn, parsed)),

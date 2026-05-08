@@ -1,27 +1,17 @@
 'use client'
 
 import { useState, FormEvent } from 'react'
+import { useRouter } from 'next/navigation'
 import Nav from '@/components/Nav'
 
 interface ImportSuccess {
   game_id: string
-  move_count: number
-  parsed: {
-    headers: {
-      white: string
-      black: string
-      result: string
-      ecoCode: string
-      openingName: string
-      playedAt: string | null
-    }
-  }
 }
 
 export default function ImportPage() {
+  const router = useRouter()
   const [pgn, setPgn] = useState('')
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState<ImportSuccess | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   async function handleSubmit(e: FormEvent) {
@@ -44,19 +34,12 @@ export default function ImportPage() {
         return
       }
 
-      setResult(data as ImportSuccess)
+      router.push(`/games/${(data as ImportSuccess).game_id}/analysis`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Network error')
     } finally {
       setLoading(false)
     }
-  }
-
-  const resultLabel: Record<string, string> = {
-    white: 'White wins',
-    black: 'Black wins',
-    draw: 'Draw',
-    unknown: 'Unknown',
   }
 
   return (
@@ -132,47 +115,6 @@ export default function ImportPage() {
           </div>
         )}
 
-        {result && (
-          <div
-            className="mt-6 p-5 rounded"
-            style={{
-              background: 'var(--surface)',
-              border: '1px solid rgba(232,224,208,0.12)',
-            }}
-          >
-            <h2
-              className="text-lg font-semibold mb-4"
-              style={{ fontFamily: 'var(--font-playfair)', color: 'var(--text)' }}
-            >
-              {result.parsed.headers.white} vs {result.parsed.headers.black}
-            </h2>
-            <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-              {[
-                ['Result', resultLabel[result.parsed.headers.result] ?? result.parsed.headers.result],
-                ['ECO', result.parsed.headers.ecoCode || '—'],
-                ['Opening', result.parsed.headers.openingName || '—'],
-                ['Half-moves', result.move_count],
-                ['Game ID', result.game_id],
-              ].map(([label, value]) => (
-                <div key={String(label)}>
-                  <dt style={{ color: 'var(--text-muted)' }} className="text-xs uppercase tracking-wider mb-0.5">
-                    {label}
-                  </dt>
-                  <dd
-                    style={{
-                      color: 'var(--text)',
-                      fontFamily: label === 'Game ID' ? 'var(--font-dm-mono)' : undefined,
-                      fontSize: label === 'Game ID' ? '11px' : undefined,
-                      wordBreak: 'break-all',
-                    }}
-                  >
-                    {value}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          </div>
-        )}
       </main>
     </>
   )

@@ -63,7 +63,7 @@ class GameImportTest extends TestCase
 
     public function test_creates_game_and_moves_and_returns_201(): void
     {
-        $response = $this->postJson('/api/games', $this->validPayload());
+        $response = $this->postJson('/api/v1/games', $this->validPayload());
 
         $response->assertStatus(201)
                  ->assertJsonStructure(['game_id', 'move_count'])
@@ -72,7 +72,7 @@ class GameImportTest extends TestCase
 
     public function test_persists_correct_move_count(): void
     {
-        $response = $this->postJson('/api/games', $this->validPayload());
+        $response = $this->postJson('/api/v1/games', $this->validPayload());
         $gameId = $response->json('game_id');
 
         $this->assertSame(3, Move::where('game_id', $gameId)->count());
@@ -80,7 +80,7 @@ class GameImportTest extends TestCase
 
     public function test_first_move_fen_before_is_starting_position(): void
     {
-        $response = $this->postJson('/api/games', $this->validPayload());
+        $response = $this->postJson('/api/v1/games', $this->validPayload());
         $gameId = $response->json('game_id');
 
         $first = Move::where('game_id', $gameId)->where('move_number', 1)->firstOrFail();
@@ -89,7 +89,7 @@ class GameImportTest extends TestCase
 
     public function test_last_move_fen_after_matches_terminal_position(): void
     {
-        $response = $this->postJson('/api/games', $this->validPayload());
+        $response = $this->postJson('/api/v1/games', $this->validPayload());
         $gameId = $response->json('game_id');
 
         $last = Move::where('game_id', $gameId)->where('move_number', 3)->firstOrFail();
@@ -98,12 +98,12 @@ class GameImportTest extends TestCase
 
     public function test_missing_required_fields_returns_422(): void
     {
-        $this->postJson('/api/games', [])->assertStatus(422);
+        $this->postJson('/api/v1/games', [])->assertStatus(422);
     }
 
     public function test_invalid_result_enum_returns_422(): void
     {
-        $this->postJson('/api/games', $this->validPayload(['result' => '1-0']))
+        $this->postJson('/api/v1/games', $this->validPayload(['result' => '1-0']))
              ->assertStatus(422);
     }
 
@@ -112,7 +112,7 @@ class GameImportTest extends TestCase
         $payload = $this->validPayload();
         $payload['moves'][0]['colour'] = 'w';
 
-        $this->postJson('/api/games', $payload)->assertStatus(422);
+        $this->postJson('/api/v1/games', $payload)->assertStatus(422);
     }
 
     public function test_invalid_uci_format_returns_422(): void
@@ -120,11 +120,11 @@ class GameImportTest extends TestCase
         $payload = $this->validPayload();
         $payload['moves'][0]['uci'] = 'e4';
 
-        $this->postJson('/api/games', $payload)->assertStatus(422);
+        $this->postJson('/api/v1/games', $payload)->assertStatus(422);
     }
 
     public function test_empty_moves_array_returns_422(): void
     {
-        $this->postJson('/api/games', $this->validPayload(['moves' => []]))->assertStatus(422);
+        $this->postJson('/api/v1/games', $this->validPayload(['moves' => []]))->assertStatus(422);
     }
 }

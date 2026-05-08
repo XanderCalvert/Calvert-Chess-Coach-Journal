@@ -35,6 +35,7 @@ class Game extends Model
         'analysis_status',
         'imported_from',
         'external_id',
+        'share_code',
     ];
 
     protected function casts(): array
