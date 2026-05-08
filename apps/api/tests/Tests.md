@@ -26,10 +26,9 @@ This document maps each PHPUnit test method to the behavior it protects. Tests l
 Deliberate gaps right now:
 
 - **End-to-end auth-protected API flows** - no authenticated profile or authorization matrix tests yet.
-- **Controller-level coverage beyond game import** - most assertions are model/data constraints plus one import endpoint.
 - **Performance and large-PGN stress cases** - import tests validate correctness, not throughput or limits.
-- **Error-body contract granularity** - most failing requests assert status code (`422`) but not detailed response error structure.
-- **Legacy scaffold tests** - example tests still exist and are not behavior-driving.
+- **Real Stockfish binary integration** - analysis job tests currently mock `StockfishService` for determinism.
+- **Command failure-path handling** - current command coverage asserts synchronous dispatch, not thrown-error output path.
 
 ## Base test case
 
@@ -56,6 +55,49 @@ Seeds a development user, submits a representative PGN-derived payload, and vali
 | `test_invalid_move_colour_returns_422` | Invalid move color enum is rejected. |
 | `test_invalid_uci_format_returns_422` | Invalid UCI move notation is rejected. |
 | `test_empty_moves_array_returns_422` | Empty move list is rejected. |
+| `test_dispatches_analyse_game_job_after_import` | Import dispatches the async analysis job with created game ID. |
+| `test_uses_defaults_when_optional_fields_are_missing` | Optional import fields fall back to intended defaults (`opening_name`, `eco_code`, `move_count`, status/source/colour, `share_code`). |
+| `test_missing_required_fields_returns_field_errors` | Validation response includes field-keyed errors for required top-level fields. |
+| `test_invalid_move_fields_return_field_errors` | Validation response includes nested move field errors (`moves.0.*`) for malformed move data. |
+
+---
+
+## Feature — `GET /api/v1/games/{id}` and share-code lookup
+
+**File:** [`Feature/GameShowTest.php`](Feature/GameShowTest.php)
+
+| Test | What it verifies |
+|------|------------------|
+| `test_show_returns_expected_contract_and_moves_ordered_by_move_number` | Game detail endpoint returns the full game/move payload contract and deterministic move ordering. |
+| `test_show_returns_404_for_unknown_uuid` | Unknown game ID returns `404`. |
+| `test_show_by_share_code_returns_same_game` | Share-code route resolves to the expected game payload. |
+| `test_show_by_share_code_returns_404_when_not_found` | Unknown share code returns `404`. |
+| `test_share_code_lookup_is_case_sensitive` | Share-code lookup behavior is documented as exact-match (case-sensitive). |
+
+---
+
+## Feature — analysis job behavior and command wiring
+
+**Files:** [`Feature/AnalyseGameJobTest.php`](Feature/AnalyseGameJobTest.php), [`Feature/AnalyseGameCommandTest.php`](Feature/AnalyseGameCommandTest.php)
+
+| Test | What it verifies |
+|------|------------------|
+| `test_job_sets_game_complete_and_updates_move_and_engine_analysis` | Job writes move-level analysis (`cp_score`, `cp_loss`, `classification`) and game summary counters/status, and upserts engine analysis rows. |
+| `test_job_skips_complete_games_unless_forced` | Job exits early for already-complete games when not forced. |
+| `test_failed_marks_game_as_failed` | Job `failed()` hook marks game analysis status as failed. |
+| `test_command_dispatches_sync_analysis_job` | `chess:analyse` command dispatches `AnalyseGameJob` synchronously with expected arguments. |
+
+---
+
+## Feature — share-code generation and migration safeguards
+
+**Files:** [`Feature/ShareCodeGeneratorTest.php`](Feature/ShareCodeGeneratorTest.php), [`Feature/ShareCodeBackfillMigrationTest.php`](Feature/ShareCodeBackfillMigrationTest.php)
+
+| Test | What it verifies |
+|------|------------------|
+| `test_generate_returns_8_char_code_with_expected_alphabet` | Generated share code matches intended 8-char unambiguous alphabet. |
+| `test_generate_returns_unique_codes_across_many_calls` | Generator does not return duplicates across a representative batch. |
+| `test_backfill_migration_replaces_non_8_char_share_codes_postgres_only` | Backfill migration upgrades non-8-char share codes (Postgres-only path). |
 
 ---
 
@@ -73,6 +115,8 @@ Seeds a development user, submits a representative PGN-derived payload, and vali
 | `test_key_moments_same_rank_in_different_games_is_allowed` | Same key-moment rank in different games is valid. |
 | `test_key_moments_rank_check_constraint_postgres_only` | Postgres CHECK enforces key-moment rank range. |
 | `test_games_partial_unique_index_postgres_only` | Postgres partial unique index prevents duplicate external-import identity per user/source. |
+| `test_engine_analyses_move_id_and_engine_name_must_be_unique` | Duplicate analysis rows for the same `(move_id, engine_name)` are rejected. |
+| `test_engine_analyses_allows_same_move_for_different_engines` | Multi-engine analysis rows for a single move are allowed. |
 
 ### Cascade and nullable foreign keys
 

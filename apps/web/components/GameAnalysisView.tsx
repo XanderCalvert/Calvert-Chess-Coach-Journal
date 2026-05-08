@@ -121,12 +121,24 @@ function MoveCell({
 
 interface Props {
   game: GameAnalysis
+  initialPly?: number
+  onPlyChange?: (ply: number) => void
 }
 
-export default function GameAnalysisView({ game }: Props) {
+export default function GameAnalysisView({ game, initialPly, onPlyChange }: Props) {
   const moves = game.moves
-  const [currentMoveIndex, setCurrentMoveIndex] = useState<number>(-1)
-  const moveListRef = useRef<HTMLTableSectionElement>(null)
+
+  const clampedInitial =
+    initialPly !== undefined
+      ? Math.min(Math.max(initialPly - 1, -1), moves.length - 1)
+      : -1
+
+  const [currentMoveIndex, setCurrentMoveIndex] = useState<number>(clampedInitial)
+  const [copiedShare, setCopiedShare]   = useState(false)
+  const [copiedPos, setCopiedPos]       = useState(false)
+  const moveListRef    = useRef<HTMLTableSectionElement>(null)
+  const onPlyChangeRef = useRef(onPlyChange)
+  onPlyChangeRef.current = onPlyChange
 
   const currentFen =
     currentMoveIndex === -1
@@ -149,6 +161,13 @@ export default function GameAnalysisView({ game }: Props) {
   const goLast    = useCallback(() => setCurrentMoveIndex(moves.length - 1), [moves.length])
   const goToMove  = useCallback((index: number) => setCurrentMoveIndex(index), [])
 
+  // Notify parent of ply changes for URL sync.
+  // Use a ref so this effect only re-runs when the index changes, not when
+  // the callback reference changes (which would create a router.replace → searchParams → re-render loop).
+  useEffect(() => {
+    onPlyChangeRef.current?.(currentMoveIndex + 1)
+  }, [currentMoveIndex]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Keyboard navigation
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
@@ -166,6 +185,22 @@ export default function GameAnalysisView({ game }: Props) {
     activeCell?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
   }, [currentMoveIndex])
 
+  function copyShareLink() {
+    if (!game.share_code) return
+    navigator.clipboard.writeText(`${window.location.origin}/g/${game.share_code}`)
+    setCopiedShare(true)
+    setTimeout(() => setCopiedShare(false), 2000)
+  }
+
+  function copyCurrentPosition() {
+    if (!game.share_code) return
+    const ply = currentMoveIndex + 1
+    const suffix = ply > 0 ? `?ply=${ply}` : ''
+    navigator.clipboard.writeText(`${window.location.origin}/g/${game.share_code}${suffix}`)
+    setCopiedPos(true)
+    setTimeout(() => setCopiedPos(false), 2000)
+  }
+
   // Group flat moves array into chess move pairs for display.
   // We iterate by 2s over the flat ordered array — safer than colour-based assumptions.
   const movePairs: Array<{ number: number; white: Move | null; black: Move | null; whiteIndex: number; blackIndex: number }> = []
@@ -181,10 +216,19 @@ export default function GameAnalysisView({ game }: Props) {
 
   const currentMove = currentMoveIndex >= 0 ? moves[currentMoveIndex] ?? null : null
 
+  const btnBase: React.CSSProperties = {
+    padding: '6px 14px',
+    fontSize: '0.8rem',
+    borderRadius: '6px',
+    border: '1px solid var(--border)',
+    cursor: 'pointer',
+    transition: 'all 0.15s',
+  }
+
   return (
     <>
       {/* Header */}
-      <div className="mb-8">
+      <div className="mb-6">
         <h1 className="text-3xl font-semibold mb-1" style={{ fontFamily: 'var(--font-playfair)', color: 'var(--text)' }}>
           {game.white_player} vs {game.black_player}
         </h1>
@@ -193,6 +237,32 @@ export default function GameAnalysisView({ game }: Props) {
           {' · '}{RESULT_LABEL[game.result] ?? game.result}
         </p>
       </div>
+
+      {/* Share buttons */}
+      {game.share_code && (
+        <div className="mb-6 flex gap-2 justify-end">
+          <button
+            onClick={copyShareLink}
+            style={{
+              ...btnBase,
+              background: copiedShare ? 'rgba(80,200,120,0.15)' : 'var(--surface)',
+              color: copiedShare ? 'var(--green)' : 'var(--text-muted)',
+            }}
+          >
+            {copiedShare ? 'Copied!' : 'Copy share link'}
+          </button>
+          <button
+            onClick={copyCurrentPosition}
+            style={{
+              ...btnBase,
+              background: copiedPos ? 'rgba(80,200,120,0.15)' : 'var(--surface)',
+              color: copiedPos ? 'var(--green)' : 'var(--text-muted)',
+            }}
+          >
+            {copiedPos ? 'Copied!' : 'Copy current position'}
+          </button>
+        </div>
+      )}
 
       {/* Analysis status banners */}
       {isPending && (

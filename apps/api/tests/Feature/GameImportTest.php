@@ -2,7 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\AnalyseGameJob;
+use App\Models\Game;
 use Database\Seeders\DevUserSeeder;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use App\Models\Move;
 use Tests\TestCase;
@@ -20,6 +23,7 @@ class GameImportTest extends TestCase
     {
         parent::setUp();
         $this->seed(DevUserSeeder::class);
+        Bus::fake();
     }
 
     private function validPayload(array $overrides = []): array
@@ -126,5 +130,64 @@ class GameImportTest extends TestCase
     public function test_empty_moves_array_returns_422(): void
     {
         $this->postJson('/api/v1/games', $this->validPayload(['moves' => []]))->assertStatus(422);
+    }
+
+    public function test_dispatches_analyse_game_job_after_import(): void
+    {
+        $response = $this->postJson('/api/v1/games', $this->validPayload())
+            ->assertStatus(201);
+
+        $gameId = $response->json('game_id');
+
+        Bus::assertDispatched(AnalyseGameJob::class, function (AnalyseGameJob $job) use ($gameId): bool {
+            return $job->gameId === $gameId && $job->force === false;
+        });
+    }
+
+    public function test_uses_defaults_when_optional_fields_are_missing(): void
+    {
+        $payload = $this->validPayload();
+        unset($payload['eco_code'], $payload['opening_name'], $payload['move_count'], $payload['played_at']);
+
+        $response = $this->postJson('/api/v1/games', $payload)->assertStatus(201);
+        $game = Game::findOrFail($response->json('game_id'));
+
+        $this->assertSame('', $game->eco_code);
+        $this->assertSame('Unknown', $game->opening_name);
+        $this->assertSame(count($payload['moves']), $game->move_count);
+        $this->assertSame('pending', $game->analysis_status->value);
+        $this->assertSame('paste', $game->imported_from->value);
+        $this->assertSame('white', $game->user_colour->value);
+        $this->assertNotNull($game->share_code);
+        $this->assertMatchesRegularExpression('/^[abcdefghjkmnpqrstuvwxyz23456789]{8}$/', $game->share_code);
+    }
+
+    public function test_missing_required_fields_returns_field_errors(): void
+    {
+        $this->postJson('/api/v1/games', [])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors([
+                'pgn_raw',
+                'white_player',
+                'black_player',
+                'result',
+                'moves',
+            ]);
+    }
+
+    public function test_invalid_move_fields_return_field_errors(): void
+    {
+        $payload = $this->validPayload();
+        $payload['moves'][0]['colour'] = 'w';
+        $payload['moves'][0]['uci'] = 'e4';
+        $payload['moves'][0]['san'] = str_repeat('N', 11);
+
+        $this->postJson('/api/v1/games', $payload)
+            ->assertStatus(422)
+            ->assertJsonValidationErrors([
+                'moves.0.colour',
+                'moves.0.uci',
+                'moves.0.san',
+            ]);
     }
 }

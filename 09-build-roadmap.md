@@ -2,7 +2,7 @@
 
 Tick `- [ ]` → `- [x]` as you complete items. In GitHub or many editors, checkboxes are clickable.
 
-> **Repo snapshot (May 2026):** Scaffold is in place: Next.js marketing homepage (static demo board), Laravel API shell with `/up`, Docker Compose (Postgres, Redis, web; optional API and engine profiles), default Laravel migrations (`users`, cache, jobs). The Python engine worker only runs `stockfish bench` then idles—no UCI/FEN analysis from the API yet. No `chess.js`, no PGN flow, no JWT/auth routes, no games/analysis schema beyond Laravel defaults.
+> **Repo snapshot (May 2026):** Full import-to-analysis pipeline is working end-to-end. PGN import (UI + API), Stockfish analysis via queued jobs, per-move centipawn evaluation, blunder/mistake/inaccuracy classification, interactive board viewer with move navigation and keyboard shortcuts, games list, public share links (`/g/{code}`) with deep-link ply support (`?ply=N`). Auth, LLM explanations, and trend tracking are still outstanding.
 
 ---
 
@@ -14,17 +14,17 @@ Get these working first, in order:
 - [x] **2.** chess.js integration — confirm PGN parsing works end-to-end
 - [x] **3.** Stockfish integration — spawn process, send a FEN, receive a best move
 - [ ] **4.** Basic auth — register, login, JWT session
-- [ ] **5.** Confirm the full pipeline works manually **before any UI polish**
+- [x] **5.** Confirm the full pipeline works manually **before any UI polish**
 
 ---
 
 ## Recommended Build Order (from the design doc)
 
-- [ ] **1.** Get Stockfish running server-side and analyse a single FEN — this is the hardest infrastructure step
-- [ ] **2.** Parse a real PGN and evaluate every position; store the results
-- [ ] **3.** Identify the 3 worst moves by centipawn loss
+- [x] **1.** Get Stockfish running server-side and analyse a single FEN — this is the hardest infrastructure step
+- [x] **2.** Parse a real PGN and evaluate every position; store the results
+- [x] **3.** Identify the 3 worst moves by centipawn loss
 - [ ] **4.** Write a prompt that produces a good explanation for one of those moments — iterate on it with real game data
-- [ ] **5.** Build the minimum UI to display the board position and explanation side by side
+- [x] **5.** Build the minimum UI to display the board position and explanation side by side
 - [ ] **6.** **Only then** add auth, the database, the queue, trends, and the rest
 
 ---
@@ -51,15 +51,15 @@ Get these working first, in order:
 
 ### 4. Analyse a full game
 
-- [ ] Run Stockfish across every position from the parsed PGN.
-- [ ] Calculate evaluation changes and centipawn loss per move.
-- [ ] Exit criteria: one full game produces stored move evaluations.
+- [x] Run Stockfish across every position from the parsed PGN.
+- [x] Calculate evaluation changes and centipawn loss per move.
+- [x] Exit criteria: one full game produces stored move evaluations.
 
 ### 5. Select key moments
 
-- [ ] Identify the 3 most important mistakes from the analysed game.
-- [ ] Store played move, best move, FEN, evaluation swing, and classification.
-- [ ] Exit criteria: the app can consistently produce 3 useful review moments from a real game.
+- [x] Identify the most important mistakes from the analysed game (blunders, mistakes, inaccuracies).
+- [x] Store played move, best move, FEN, evaluation swing, and classification.
+- [x] Exit criteria: the app can consistently produce classified move evaluations from a real game.
 
 ### 6. Add mistake tags
 
@@ -75,9 +75,11 @@ Get these working first, in order:
 
 ### 8. Build the analysis UI
 
-- [ ] Add the minimum page for reviewing a game: board, move context, played move, best move, tag, and explanation.
-- [ ] Include loading, failed-analysis, and empty states.
-- [ ] Exit criteria: a user can paste a PGN and review the 3 key moments without developer help.
+- [x] Add the minimum page for reviewing a game: board, move list, move navigation (click, keyboard, buttons).
+- [x] Include loading, failed-analysis, and pending/running states.
+- [x] Public share links (`/g/{share_code}`) and deep-link to specific position (`?ply=N`).
+- [ ] Key moment cards with played move, best move, and explanation side by side.
+- [ ] Exit criteria: a user can paste a PGN and review the key moments without developer help.
 
 ### 9. Add accounts and persistence
 
@@ -116,10 +118,10 @@ Get these working first, in order:
 **Progress (tick as you go):**
 
 - [ ] **M1 — Foundation:** Project scaffold, auth, database schema, PGN parse to Moves table
-- [ ] **M2 — Engine:** Stockfish worker, centipawn evaluation, classification, Key Moments selection
+- [x] **M2 — Engine:** Stockfish worker, centipawn evaluation, classification, move-level key moments
 - [ ] **M3 — Heuristic Tags:** Rule-based mistake tagging for 5 MVP tags
 - [ ] **M4 — Explanations:** LLM API integration, prompt template, explanation stored and displayed
-- [ ] **M5 — Game UI:** Analysis page with board, key moment cards, played vs best move view
+- [ ] **M5 — Game UI:** Analysis page with board, key moment cards, played vs best move view *(board + move list done; key moment cards and explanations outstanding)*
 - [ ] **M6 — Summary + Notes:** Game summary generation, manual notes, coach agreement toggle
 - [ ] **M7 — Trends MVP:** Trend summary computed, simple trends page with table and chart
 - [ ] **M8 — Dashboard:** Dashboard with stat cards, recent games list, study recommendation

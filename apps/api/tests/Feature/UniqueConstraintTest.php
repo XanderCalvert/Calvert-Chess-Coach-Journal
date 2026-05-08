@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\EngineAnalysis;
 use App\Models\Game;
 use App\Models\KeyMoment;
 use App\Models\MistakeTag;
@@ -119,5 +120,70 @@ class UniqueConstraintTest extends TestCase
             'imported_from' => 'lichess',
             'external_id'   => 'abc123',
         ]);
+    }
+
+    public function test_engine_analyses_move_id_and_engine_name_must_be_unique(): void
+    {
+        $move = Move::factory()->create();
+
+        EngineAnalysis::create([
+            'move_id' => $move->id,
+            'engine_name' => 'stockfish',
+            'best_move_uci' => 'e2e4',
+            'best_move_san' => 'e4',
+            'best_line' => ['e2e4'],
+            'depth' => 18,
+            'depth_requested' => 12,
+            'depth_reached' => 12,
+            'cp_evaluation' => 32,
+            'analysed_at' => now(),
+        ]);
+
+        $this->expectException(QueryException::class);
+        EngineAnalysis::create([
+            'move_id' => $move->id,
+            'engine_name' => 'stockfish',
+            'best_move_uci' => 'd2d4',
+            'best_move_san' => 'd4',
+            'best_line' => ['d2d4'],
+            'depth' => 18,
+            'depth_requested' => 12,
+            'depth_reached' => 12,
+            'cp_evaluation' => 20,
+            'analysed_at' => now(),
+        ]);
+    }
+
+    public function test_engine_analyses_allows_same_move_for_different_engines(): void
+    {
+        $move = Move::factory()->create();
+
+        $analysisA = EngineAnalysis::create([
+            'move_id' => $move->id,
+            'engine_name' => 'stockfish',
+            'best_move_uci' => 'e2e4',
+            'best_move_san' => null,
+            'best_line' => ['e2e4'],
+            'depth' => 18,
+            'depth_requested' => 12,
+            'depth_reached' => 12,
+            'cp_evaluation' => 32,
+            'analysed_at' => now(),
+        ]);
+        $analysisB = EngineAnalysis::create([
+            'move_id' => $move->id,
+            'engine_name' => 'lc0',
+            'best_move_uci' => 'd2d4',
+            'best_move_san' => 'd4',
+            'best_line' => ['d2d4'],
+            'depth' => 18,
+            'depth_requested' => 12,
+            'depth_reached' => 12,
+            'cp_evaluation' => 15,
+            'analysed_at' => now(),
+        ]);
+
+        $this->assertDatabaseHas('engine_analyses', ['id' => $analysisA->id]);
+        $this->assertDatabaseHas('engine_analyses', ['id' => $analysisB->id]);
     }
 }

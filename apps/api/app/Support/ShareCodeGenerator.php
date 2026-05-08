@@ -6,9 +6,9 @@ use Illuminate\Support\Facades\DB;
 
 class ShareCodeGenerator
 {
-    // No 0/O, no 1/I — unambiguous for humans to type or read aloud
-    private const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    private const LENGTH   = 6;
+    // No 0/o, no 1/i/l — unambiguous lowercase for humans to type or read aloud
+    private const ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789';
+    private const LENGTH   = 8;
 
     public static function generate(): string
     {

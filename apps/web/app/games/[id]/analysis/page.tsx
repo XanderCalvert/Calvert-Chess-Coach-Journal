@@ -1,23 +1,22 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useEffect, useState, useCallback } from 'react'
+import { useParams, useSearchParams, useRouter, usePathname } from 'next/navigation'
 import Nav from '@/components/Nav'
 import GameAnalysisView, { type GameAnalysis } from '@/components/GameAnalysisView'
 
 export default function AnalysisPage() {
-  const { id } = useParams<{ id: string }>()
+  const { id }       = useParams<{ id: string }>()
+  const searchParams = useSearchParams()
+  const router       = useRouter()
+  const pathname     = usePathname()
+
+  const rawPly  = parseInt(searchParams.get('ply') ?? '', 10)
+  const initialPly = isNaN(rawPly) || rawPly < 0 ? 0 : rawPly
+
   const [game, setGame]   = useState<GameAnalysis | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [polling, setPolling] = useState(false)
-  const [copied, setCopied] = useState(false)
-
-  function copyShareLink() {
-    if (!game?.share_code) return
-    navigator.clipboard.writeText(`${window.location.origin}/g/${game.share_code}`)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
 
   useEffect(() => {
     let cancelled = false
@@ -54,6 +53,17 @@ export default function AnalysisPage() {
     return () => clearInterval(interval)
   }, [polling, id])
 
+  const handlePlyChange = useCallback((ply: number) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (ply === 0) {
+      params.delete('ply')
+    } else {
+      params.set('ply', String(ply))
+    }
+    const queryString = params.toString()
+    router.replace(queryString ? `${pathname}?${queryString}` : pathname, { scroll: false })
+  }, [searchParams, router, pathname])
+
   return (
     <>
       <Nav />
@@ -66,26 +76,13 @@ export default function AnalysisPage() {
         {!game && !error && (
           <p style={{ color: 'var(--text-muted)' }}>Loading…</p>
         )}
-        {game?.share_code && (
-          <div className="mb-4 flex justify-end">
-            <button
-              onClick={copyShareLink}
-              style={{
-                padding: '6px 14px',
-                fontSize: '0.8rem',
-                borderRadius: '6px',
-                border: '1px solid var(--border)',
-                background: copied ? 'rgba(80,200,120,0.15)' : 'var(--surface)',
-                color: copied ? 'var(--green)' : 'var(--text-muted)',
-                cursor: 'pointer',
-                transition: 'all 0.15s',
-              }}
-            >
-              {copied ? 'Copied!' : 'Copy share link'}
-            </button>
-          </div>
+        {game && (
+          <GameAnalysisView
+            game={game}
+            initialPly={initialPly}
+            onPlyChange={handlePlyChange}
+          />
         )}
-        {game && <GameAnalysisView game={game} />}
       </main>
     </>
   )

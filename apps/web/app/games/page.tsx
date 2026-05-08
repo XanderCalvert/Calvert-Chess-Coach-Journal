@@ -6,6 +6,7 @@ import Nav from '@/components/Nav'
 
 interface GameSummary {
   id: string
+  share_code: string | null
   white_player: string
   black_player: string
   result: string
@@ -166,7 +167,7 @@ export default function GamesPage() {
                         </td>
                         <td className="px-4 py-3 text-right">
                           <Link
-                            href={`/games/${g.id}/analysis`}
+                            href={g.share_code ? `/g/${g.share_code}` : `/games/${g.id}/analysis`}
                             className="text-xs px-3 py-1 rounded"
                             style={{ color: 'var(--gold)', border: '1px solid rgba(201,168,76,0.3)' }}
                           >

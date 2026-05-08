@@ -1,12 +1,19 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useEffect, useState, useCallback } from 'react'
+import { useParams, useSearchParams, useRouter, usePathname } from 'next/navigation'
 import Nav from '@/components/Nav'
 import GameAnalysisView, { type GameAnalysis } from '@/components/GameAnalysisView'
 
 export default function SharePage() {
-  const { code } = useParams<{ code: string }>()
+  const { code }        = useParams<{ code: string }>()
+  const searchParams    = useSearchParams()
+  const router          = useRouter()
+  const pathname        = usePathname()
+
+  const rawPly  = parseInt(searchParams.get('ply') ?? '', 10)
+  const initialPly = isNaN(rawPly) || rawPly < 0 ? 0 : rawPly
+
   const [game, setGame]   = useState<GameAnalysis | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [polling, setPolling] = useState(false)
@@ -50,6 +57,17 @@ export default function SharePage() {
     return () => clearInterval(interval)
   }, [polling, code])
 
+  const handlePlyChange = useCallback((ply: number) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (ply === 0) {
+      params.delete('ply')
+    } else {
+      params.set('ply', String(ply))
+    }
+    const queryString = params.toString()
+    router.replace(queryString ? `${pathname}?${queryString}` : pathname, { scroll: false })
+  }, [searchParams, router, pathname])
+
   return (
     <>
       <Nav />
@@ -62,7 +80,13 @@ export default function SharePage() {
         {!game && !error && (
           <p style={{ color: 'var(--text-muted)' }}>Loading…</p>
         )}
-        {game && <GameAnalysisView game={game} />}
+        {game && (
+          <GameAnalysisView
+            game={game}
+            initialPly={initialPly}
+            onPlyChange={handlePlyChange}
+          />
+        )}
       </main>
     </>
   )
