@@ -13,6 +13,8 @@ class DatabaseSeeder extends Seeder
         $this->call(MistakeTagSeeder::class);
 
         if (! App::isProduction()) {
+            $this->call(DevUserSeeder::class);
+
             User::factory()->create([
                 'display_name' => 'Test User',
                 'email'        => 'test@example.com',
