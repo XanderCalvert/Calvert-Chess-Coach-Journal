@@ -19,6 +19,7 @@ Full-stack web application for post-game chess analysis, AI explanations, and im
 | [07-mistake-taxonomy.md](./07-mistake-taxonomy.md) | All 12 mistake tags with slugs, descriptions, and heuristic detection rules |
 | [08-ui-structure.md](./08-ui-structure.md) | All screens, components, empty states, and user flows |
 | [09-build-roadmap.md](./09-build-roadmap.md) | MVP milestones, Phase 1 milestones, recommended build order, practical advice |
+| [10-pages-and-sharing-plan.md](./10-pages-and-sharing-plan.md) | Route-by-route page plan, public sharing URL design, and implementation direction |
 
 ---
 

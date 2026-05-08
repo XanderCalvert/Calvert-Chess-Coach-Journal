@@ -15,10 +15,13 @@ class EngineAnalysis extends Model
 
     protected $fillable = [
         'move_id',
+        'engine_name',
         'best_move_uci',
         'best_move_san',
         'best_line',
         'depth',
+        'depth_requested',
+        'depth_reached',
         'cp_evaluation',
         'analysed_at',
     ];

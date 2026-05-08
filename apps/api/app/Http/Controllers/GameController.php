@@ -6,6 +6,7 @@ use App\Enums\AnalysisStatus;
 use App\Enums\GameResult;
 use App\Enums\ImportSource;
 use App\Enums\PlayerColour;
+use App\Jobs\AnalyseGameJob;
 use App\Models\Game;
 use App\Models\Move;
 use Database\Seeders\DevUserSeeder;
@@ -66,6 +67,8 @@ class GameController extends Controller
 
             return $game;
         });
+
+        AnalyseGameJob::dispatch($game->id)->afterCommit();
 
         return response()->json([
             'game_id'    => $game->id,

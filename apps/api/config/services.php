@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'stockfish' => [
+        'binary'  => env('STOCKFISH_BINARY', '/usr/games/stockfish'),
+        'depth'   => (int) env('STOCKFISH_DEPTH', 12),
+        'timeout' => (int) env('STOCKFISH_TIMEOUT', 10),
+    ],
+
 ];
