@@ -112,6 +112,7 @@ DB_PASSWORD=<your local Postgres password>
 | [08-ui-structure.md](./08-ui-structure.md) | Screens and flows |
 | [09-build-roadmap.md](./09-build-roadmap.md) | Milestones and build order |
 | [apps/api/tests/Tests.md](./apps/api/tests/Tests.md) | API test suite behavior reference |
+| [ADMIN-GUIDE.md](./ADMIN-GUIDE.md) | Operator commands (sync, analysis, queues) |
 | [AGENTS.md](./AGENTS.md) | Guidance for contributors and AI agents |
 
 ## Testing

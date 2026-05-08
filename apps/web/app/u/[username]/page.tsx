@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Nav from '@/components/Nav'
+import Sparkline from '@/components/Sparkline'
 
 interface ConnectedAccount {
   id: string
@@ -44,11 +45,54 @@ interface GamesMeta {
   total: number
 }
 
+type GameTypeFilter = 'all' | 'bullet' | 'blitz' | 'rapid' | 'daily'
+
+interface AnalysedCountsByType {
+  bullet: number
+  blitz: number
+  rapid: number
+  daily: number
+}
+
+interface TrendPoint { played_at: string; rating?: number; avg_cp_loss?: number; blunders?: number }
+
+interface RecentGame {
+  share_code: string
+  played_at: string | null
+  result: 'WIN' | 'LOSS' | 'DRAW'
+  opponent_username: string | null
+  avg_cp_loss: number | null
+  blunder_count: number
+}
+
+interface ProfileStats {
+  games_analysed: number
+  wins: number
+  draws: number
+  losses: number
+  avg_cp_loss: number | null
+  blunders_per_game: number | null
+  mistakes_per_game: number | null
+  inaccuracies_per_game: number | null
+  rating_trend: TrendPoint[]
+  cp_loss_trend: TrendPoint[]
+  blunders_trend: TrendPoint[]
+  recent_games: RecentGame[]
+  analysed_counts_by_type?: AnalysedCountsByType
+  recommended_game_type?: string | null
+}
+
 const RESULT_LABEL: Record<string, string> = {
   white: '1-0',
   black: '0-1',
   draw: '½-½',
   unknown: '—',
+}
+
+const PLAYER_RESULT_COLOUR: Record<string, string> = {
+  WIN:  'var(--green)',
+  LOSS: 'var(--red)',
+  DRAW: 'var(--text-muted)',
 }
 
 const STATUS_STYLES: Record<string, { label: string; color: string }> = {
@@ -65,6 +109,23 @@ const SYNC_STATUS_STYLES: Record<string, { label: string; color: string }> = {
   failed:       { label: 'Sync failed',  color: '#f87171' },
 }
 
+const GAME_TYPE_OPTIONS: Array<{ value: GameTypeFilter; label: string }> = [
+  { value: 'all', label: 'All types' },
+  { value: 'bullet', label: 'Bullet' },
+  { value: 'blitz', label: 'Blitz' },
+  { value: 'rapid', label: 'Rapid' },
+  { value: 'daily', label: 'Daily' },
+]
+
+const STAT_HELP: Record<string, string> = {
+  analysed: 'Number of games with completed analysis in the selected game type.',
+  wdl: 'Wins, draws, and losses from your perspective in analysed games.',
+  avgCpl: 'Average centipawn loss on your moves only. Lower is better.',
+  blunders: 'Average number of blunders per analysed game.',
+  mistakes: 'Average number of mistakes per analysed game.',
+  inaccuracies: 'Average number of inaccuracies per analysed game.',
+}
+
 function RatingStat({ label, value }: { label: string; value: number | null }) {
   return (
     <div className="text-center px-5 py-4 rounded" style={{ background: 'var(--surface)', border: '1px solid rgba(232,224,208,0.10)' }}>
@@ -76,25 +137,72 @@ function RatingStat({ label, value }: { label: string; value: number | null }) {
   )
 }
 
-function TrendStat({ label, value }: { label: string; value: string }) {
+function StatCard({ label, value, color, helpText }: { label: string; value: string; color?: string; helpText?: string }) {
   return (
     <div className="px-4 py-3 rounded" style={{ background: 'var(--surface)', border: '1px solid rgba(232,224,208,0.10)' }}>
-      <div className="text-xs uppercase tracking-wider mb-0.5" style={{ color: 'var(--text-muted)' }}>{label}</div>
-      <div className="text-lg font-medium" style={{ fontFamily: 'var(--font-dm-mono)', color: 'var(--gold)' }}>{value}</div>
+      <div className="text-xs uppercase tracking-wider mb-0.5" style={{ color: 'var(--text-muted)' }}>
+        <StatLabel label={label} helpText={helpText} />
+      </div>
+      <div className="text-lg font-medium" style={{ fontFamily: 'var(--font-dm-mono)', color: color ?? 'var(--gold)' }}>{value}</div>
     </div>
   )
 }
 
-function computeTrends(games: ProfileGame[]) {
-  const analysed = games.filter(g => g.analysis_status === 'complete')
-  if (analysed.length === 0) return { avgBlunders: null }
+function StatLabel({ label, helpText }: { label: string; helpText?: string }) {
+  return (
+    <div className="flex items-center gap-1">
+      <span>{label}</span>
+      {helpText && (
+        <span
+          title={helpText}
+          aria-label={helpText}
+          className="inline-flex items-center justify-center rounded-full text-[10px] h-4 w-4"
+          style={{ border: '1px solid rgba(232,224,208,0.25)', color: 'var(--text-faint)' }}
+        >
+          ?
+        </span>
+      )}
+    </div>
+  )
+}
 
-  const withBlunders = analysed.filter(g => g.blunder_count != null)
-  const avgBlunders = withBlunders.length > 0
-    ? (withBlunders.reduce((s, g) => s + (g.blunder_count ?? 0), 0) / withBlunders.length).toFixed(1)
-    : null
+function StatCardSkeleton() {
+  return (
+    <div className="px-4 py-3 rounded" style={{ background: 'var(--surface)', border: '1px solid rgba(232,224,208,0.10)' }}>
+      <div className="h-2.5 w-20 rounded mb-2" style={{ background: 'rgba(232,224,208,0.08)' }} />
+      <div className="h-5 w-12 rounded" style={{ background: 'rgba(232,224,208,0.08)' }} />
+    </div>
+  )
+}
 
-  return { avgBlunders }
+function SparklinePanel({ title, subtitle, data, minValue, maxValue }: {
+  title: string
+  subtitle: string
+  data: number[]
+  minValue: number
+  maxValue: number
+}) {
+  return (
+    <div className="p-4 rounded" style={{ background: 'var(--surface)', border: '1px solid rgba(232,224,208,0.10)' }}>
+      <div className="text-xs uppercase tracking-wider mb-0.5" style={{ color: 'var(--text-muted)' }}>{title}</div>
+      <div className="text-sm font-medium mb-3" style={{ fontFamily: 'var(--font-dm-mono)', color: 'var(--gold)' }}>{subtitle}</div>
+      {data.length >= 2 ? (
+        <Sparkline data={data} minValue={minValue} maxValue={maxValue} />
+      ) : (
+        <div className="h-[60px] flex items-center justify-center text-xs" style={{ color: 'var(--text-faint)' }}>
+          Not enough data
+        </div>
+      )}
+    </div>
+  )
+}
+
+function fmt(n: number | null, decimals = 1): string {
+  return n != null ? n.toFixed(decimals) : '—'
+}
+
+function isGameTypeFilter(value: string | null): value is Exclude<GameTypeFilter, 'all'> {
+  return value === 'bullet' || value === 'blitz' || value === 'rapid' || value === 'daily'
 }
 
 export default function ProfilePage() {
@@ -111,6 +219,12 @@ export default function ProfilePage() {
   const [error, setError] = useState<string | null>(null)
   const [gamesTrigger, setGamesTrigger] = useState(0)
 
+  const [stats, setStats] = useState<ProfileStats | null>(null)
+  const [statsLoading, setStatsLoading] = useState(true)
+  /** `null` until first bootstrap fetch picks default from API `recommended_game_type`. */
+  const [gameTypeFilter, setGameTypeFilter] = useState<GameTypeFilter | null>(null)
+  const [analysedCountsByType, setAnalysedCountsByType] = useState<AnalysedCountsByType | null>(null)
+
   // Sync state
   const [syncing, setSyncing] = useState(false)
   const [syncError, setSyncError] = useState<string | null>(null)
@@ -122,23 +236,86 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (!username) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true)
     setNotFound(false)
     setError(null)
+    setGameTypeFilter(null)
+    setAnalysedCountsByType(null)
+    setStats(null)
 
-    fetch(`/api/connected-accounts/chesscom/${username}`)
-      .then(async res => {
-        if (res.status === 404) { setNotFound(true); return }
-        if (!res.ok) {
-          const d = await res.json().catch(() => null)
-          setError(d?.error ?? `Error loading profile (${res.status})`)
-          return
-        }
-        setAccount(await res.json())
-      })
-      .catch(err => setError(err instanceof Error ? err.message : 'Network error'))
+    fetch(`/api/connected-accounts/chesscom/${username}`).then(async accountRes => {
+      if (accountRes.status === 404) { setNotFound(true); return }
+      if (!accountRes.ok) {
+        const d = await accountRes.json().catch(() => null)
+        setError(d?.error ?? `Error loading profile (${accountRes.status})`)
+        return
+      }
+      setAccount(await accountRes.json())
+    }).catch(err => setError(err instanceof Error ? err.message : 'Network error'))
       .finally(() => setLoading(false))
   }, [username])
+
+  // Bootstrap default game-type filter from analysed counts (one fetch with `all`).
+  useEffect(() => {
+    if (!username || notFound) return
+    if (gameTypeFilter !== null) return
+
+    fetch(`/api/connected-accounts/chesscom/${username}/stats?game_type=all`)
+      .then(async res => {
+        if (!res.ok) {
+          setGameTypeFilter('all')
+          return
+        }
+        const data: ProfileStats = await res.json()
+        if (data.analysed_counts_by_type) {
+          setAnalysedCountsByType(data.analysed_counts_by_type)
+        }
+        const rec = data.recommended_game_type
+        setGameTypeFilter(isGameTypeFilter(rec) ? rec : 'all')
+      })
+      .catch(() => setGameTypeFilter('all'))
+  }, [username, notFound, gameTypeFilter])
+
+  useEffect(() => {
+    if (!username || notFound) return
+    if (gameTypeFilter === null) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setStatsLoading(true)
+    fetch(`/api/connected-accounts/chesscom/${username}/stats?game_type=${gameTypeFilter}`)
+      .then(async res => {
+        if (!res.ok) return
+        const data: ProfileStats = await res.json()
+        setStats(data)
+        if (data.analysed_counts_by_type) {
+          setAnalysedCountsByType(data.analysed_counts_by_type)
+        }
+      })
+      .finally(() => setStatsLoading(false))
+  }, [username, gameTypeFilter, notFound])
+
+  // If the selected type has no analysed games (e.g. after sync), fall back.
+  useEffect(() => {
+    if (gameTypeFilter === null || !analysedCountsByType) return
+    if (gameTypeFilter === 'all') return
+    if (analysedCountsByType[gameTypeFilter] > 0) return
+    const rec = stats?.recommended_game_type
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setGameTypeFilter(isGameTypeFilter(rec) ? rec : 'all')
+  }, [analysedCountsByType, gameTypeFilter, stats?.recommended_game_type])
+
+  // Refresh stats after sync completes
+  async function refreshStats() {
+    if (gameTypeFilter === null) return
+    const res = await fetch(`/api/connected-accounts/chesscom/${username}/stats?game_type=${gameTypeFilter}`)
+    if (res.ok) {
+      const data: ProfileStats = await res.json()
+      setStats(data)
+      if (data.analysed_counts_by_type) {
+        setAnalysedCountsByType(data.analysed_counts_by_type)
+      }
+    }
+  }
 
   // Poll sync status while syncing
   useEffect(() => {
@@ -153,20 +330,29 @@ export default function ProfilePage() {
         if (updated.sync_status === 'synced' || updated.sync_status === 'failed') {
           clearInterval(id)
           setGamesTrigger(n => n + 1)
+          refreshStats()
         }
       } catch {
-        // ignore transient errors during polling
+        // ignore transient polling errors
       }
     }, 3000)
 
     return () => clearInterval(id)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [account?.sync_status, username])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPage(1)
+  }, [gameTypeFilter])
+
+  useEffect(() => {
     if (!account) return
+    if (gameTypeFilter === null) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setGamesLoading(true)
 
-    fetch(`/api/connected-accounts/chesscom/${account.normalised_username ?? username}/games?page=${page}`)
+    fetch(`/api/connected-accounts/chesscom/${account.normalised_username ?? username}/games?page=${page}&game_type=${gameTypeFilter}`)
       .then(async res => {
         if (!res.ok) return
         const d = await res.json()
@@ -175,7 +361,19 @@ export default function ProfilePage() {
       })
       .finally(() => setGamesLoading(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [account?.id, page, gamesTrigger])
+  }, [account?.id, page, gamesTrigger, gameTypeFilter, username])
+
+  const gameTypeDropdownOptions = useMemo(() => {
+    if (!analysedCountsByType) {
+      return GAME_TYPE_OPTIONS
+    }
+    return [
+      GAME_TYPE_OPTIONS[0],
+      ...GAME_TYPE_OPTIONS.slice(1).filter(
+        option => analysedCountsByType[option.value as keyof AnalysedCountsByType] > 0
+      ),
+    ]
+  }, [analysedCountsByType])
 
   async function handleSync() {
     setSyncing(true)
@@ -219,7 +417,6 @@ export default function ProfilePage() {
     }
   }
 
-  const { avgBlunders } = computeTrends(games)
   const lastSynced = account?.last_synced_at
     ? new Date(account.last_synced_at).toLocaleString()
     : null
@@ -229,6 +426,16 @@ export default function ProfilePage() {
     : null
 
   const isSyncing = account?.sync_status === 'syncing' || syncing
+
+  // Sparkline data arrays
+  const ratingData = stats?.rating_trend.map(p => p.rating!).filter(v => v != null) ?? []
+  const cpLossData  = stats?.cp_loss_trend.map(p => p.avg_cp_loss!) ?? []
+  const blunderData = stats?.blunders_trend.map(p => p.blunders!) ?? []
+
+  const ratingMin = ratingData.length ? Math.max(0, Math.min(...ratingData) - 50) : 800
+  const ratingMax = ratingData.length ? Math.max(...ratingData) + 50 : 1200
+  const cpLossMax  = cpLossData.length  ? Math.max(Math.max(...cpLossData) + 20, 100) : 100
+  const blunderMax = blunderData.length ? Math.max(Math.max(...blunderData) + 1, 5) : 5
 
   if (loading) {
     return (
@@ -338,7 +545,7 @@ export default function ProfilePage() {
         </div>
 
         {/* Meta row */}
-        <div className="flex flex-wrap gap-x-6 gap-y-1 mb-6 text-sm" style={{ color: 'var(--text-muted)' }}>
+        <div className="flex flex-wrap gap-x-6 gap-y-1 mb-8 text-sm" style={{ color: 'var(--text-muted)' }}>
           <span><strong style={{ color: 'var(--text)' }}>{meta?.total ?? 0}</strong> games imported</span>
           {lastSynced && (
             <span>Last synced: <strong style={{ color: 'var(--text)' }}>{lastSynced}</strong></span>
@@ -348,118 +555,259 @@ export default function ProfilePage() {
           )}
         </div>
 
-        {/* Trend cards */}
-        <div className="grid grid-cols-1 gap-3 mb-8 max-w-xs">
-          <TrendStat label="Blunders/game" value={avgBlunders ?? '—'} />
-        </div>
-
-        {/* Games table */}
-        {gamesLoading ? (
-          <p style={{ color: 'var(--text-muted)' }}>Loading games…</p>
-        ) : games.length === 0 ? (
-          <div className="p-8 rounded text-center" style={{ background: 'var(--surface)', border: '1px solid rgba(232,224,208,0.10)' }}>
-            <p style={{ color: 'var(--text-muted)' }}>No games imported yet. Press Sync Now to fetch your latest games.</p>
+        {/* Trend dashboard */}
+        <section className="mb-10">
+          <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
+            <h2 className="text-base font-semibold" style={{ fontFamily: 'var(--font-playfair)', color: 'var(--text)' }}>
+              Analysis trends
+            </h2>
+            <label className="flex items-center gap-2 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+              Game type
+              <select
+                value={gameTypeFilter ?? 'all'}
+                disabled={gameTypeFilter === null}
+                onChange={e => setGameTypeFilter(e.target.value as GameTypeFilter)}
+                className="px-3 py-1.5 rounded text-xs"
+                style={{
+                  background: 'var(--surface)',
+                  color: 'var(--text)',
+                  border: '1px solid rgba(232,224,208,0.18)',
+                  opacity: gameTypeFilter === null ? 0.65 : 1,
+                }}
+              >
+                {gameTypeDropdownOptions.map(option => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                    {analysedCountsByType && option.value !== 'all'
+                      ? ` (${analysedCountsByType[option.value as keyof AnalysedCountsByType]})`
+                      : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
-        ) : (
-          <>
-            <div className="rounded overflow-hidden mb-6" style={{ border: '1px solid rgba(232,224,208,0.10)' }}>
-              <table className="w-full text-sm" style={{ borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ background: 'var(--surface)', borderBottom: '1px solid rgba(232,224,208,0.10)' }}>
-                    {['Result', 'Opponent', 'Time control', 'Blunders', 'Status', ''].map(h => (
-                      <th
-                        key={h}
-                        className="text-left px-4 py-3 text-xs uppercase tracking-wider"
-                        style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap' }}
-                      >
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {games.map((g, i) => {
-                    const status = STATUS_STYLES[g.analysis_status] ?? STATUS_STYLES.pending
-                    return (
-                      <tr
-                        key={g.id}
-                        style={{ borderBottom: i < games.length - 1 ? '1px solid rgba(232,224,208,0.06)' : undefined }}
-                      >
-                        <td className="px-4 py-3 font-medium" style={{ color: 'var(--text)', fontFamily: 'var(--font-dm-mono)' }}>
-                          {RESULT_LABEL[g.result] ?? '—'}
+
+          {/* Aggregate stat cards */}
+          <div className="grid grid-cols-3 gap-3 mb-6 sm:grid-cols-6">
+            {statsLoading ? (
+              Array.from({ length: 6 }).map((_, i) => <StatCardSkeleton key={i} />)
+            ) : (
+              <>
+                <StatCard label="Analysed" helpText={STAT_HELP.analysed} value={String(stats?.games_analysed ?? 0)} color="var(--text)" />
+                <StatCard
+                  label="W / D / L"
+                  helpText={STAT_HELP.wdl}
+                  value={stats && stats.games_analysed > 0
+                    ? `${stats.wins}W · ${stats.draws}D · ${stats.losses}L`
+                    : '—'}
+                  color="var(--text)"
+                />
+                <StatCard label="Avg CPL" helpText={STAT_HELP.avgCpl} value={fmt(stats?.avg_cp_loss ?? null, 1)} />
+                <StatCard label="Blunders/game" helpText={STAT_HELP.blunders} value={fmt(stats?.blunders_per_game ?? null)} />
+                <StatCard label="Mistakes/game" helpText={STAT_HELP.mistakes} value={fmt(stats?.mistakes_per_game ?? null)} />
+                <StatCard label="Inaccuracies/game" helpText={STAT_HELP.inaccuracies} value={fmt(stats?.inaccuracies_per_game ?? null)} />
+              </>
+            )}
+          </div>
+
+          {/* Sparkline charts */}
+          {!statsLoading && (
+            <div className="grid grid-cols-1 gap-4 mb-6 sm:grid-cols-3">
+              <SparklinePanel
+                title="Rating"
+                subtitle={ratingData.length ? String(ratingData[ratingData.length - 1]) : '—'}
+                data={ratingData}
+                minValue={ratingMin}
+                maxValue={ratingMax}
+              />
+              <SparklinePanel
+                title="Avg CPL"
+                subtitle={cpLossData.length ? fmt(cpLossData[cpLossData.length - 1]) : '—'}
+                data={cpLossData}
+                minValue={0}
+                maxValue={cpLossMax}
+              />
+              <SparklinePanel
+                title="Blunders/game"
+                subtitle={blunderData.length ? String(blunderData[blunderData.length - 1]) : '—'}
+                data={blunderData}
+                minValue={0}
+                maxValue={blunderMax}
+              />
+            </div>
+          )}
+
+          {/* Recent analysed games */}
+          {!statsLoading && stats && stats.recent_games.length > 0 && (
+            <div>
+              <h3 className="text-xs uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>
+                Recent analysed games
+              </h3>
+              <div className="rounded overflow-hidden" style={{ border: '1px solid rgba(232,224,208,0.10)' }}>
+                <table className="w-full text-sm" style={{ borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: 'var(--surface)', borderBottom: '1px solid rgba(232,224,208,0.10)' }}>
+                      {['Date', 'Opponent', 'Result', 'Avg CPL', 'Blunders', ''].map(h => (
+                        <th key={h} className="text-left px-4 py-2 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stats.recent_games.map((g, i) => (
+                      <tr key={g.share_code} style={{ borderBottom: i < stats.recent_games.length - 1 ? '1px solid rgba(232,224,208,0.06)' : undefined }}>
+                        <td className="px-4 py-2.5" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-dm-mono)', fontSize: '12px' }}>
+                          {g.played_at ?? '—'}
                         </td>
-                        <td className="px-4 py-3" style={{ color: 'var(--text-muted)' }}>
+                        <td className="px-4 py-2.5" style={{ color: 'var(--text-muted)' }}>
                           {g.opponent_username ?? '—'}
-                          {g.opponent_rating != null && (
-                            <span className="ml-1.5" style={{ color: 'var(--text-faint)', fontSize: '11px', fontFamily: 'var(--font-dm-mono)' }}>
-                              ({g.opponent_rating})
-                            </span>
-                          )}
                         </td>
-                        <td className="px-4 py-3" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-dm-mono)', fontSize: '12px' }}>
-                          {g.time_control ?? '—'}
+                        <td className="px-4 py-2.5 font-medium" style={{ fontFamily: 'var(--font-dm-mono)', color: PLAYER_RESULT_COLOUR[g.result] ?? 'var(--text-muted)' }}>
+                          {g.result}
                         </td>
-                        <td className="px-4 py-3 font-medium" style={{ color: g.blunder_count != null && g.blunder_count > 0 ? '#f87171' : 'var(--text-muted)', fontFamily: 'var(--font-dm-mono)' }}>
-                          {g.blunder_count ?? (g.analysis_status === 'complete' ? '0' : '—')}
+                        <td className="px-4 py-2.5" style={{ fontFamily: 'var(--font-dm-mono)', color: 'var(--text-muted)' }}>
+                          {fmt(g.avg_cp_loss)}
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <span className="text-xs" style={{ color: status.color }}>{status.label}</span>
+                        <td className="px-4 py-2.5 font-medium" style={{ fontFamily: 'var(--font-dm-mono)', color: g.blunder_count > 0 ? '#f87171' : 'var(--text-muted)' }}>
+                          {g.blunder_count}
                         </td>
-                        <td className="px-4 py-3 text-right">
-                          {g.share_code && (
-                            <Link
-                              href={`/g/${g.share_code}`}
-                              className="text-xs px-3 py-1 rounded"
-                              style={{ color: 'var(--gold)', border: '1px solid rgba(201,168,76,0.3)' }}
-                            >
-                              View →
-                            </Link>
-                          )}
+                        <td className="px-4 py-2.5 text-right">
+                          <Link
+                            href={`/g/${g.share_code}`}
+                            className="text-xs px-3 py-1 rounded"
+                            style={{ color: 'var(--gold)', border: '1px solid rgba(201,168,76,0.3)' }}
+                          >
+                            View →
+                          </Link>
                         </td>
                       </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            {meta && meta.last_page > 1 && (
-              <div className="flex items-center justify-between text-sm">
-                <span style={{ color: 'var(--text-muted)' }}>
-                  Page {meta.current_page} of {meta.last_page}
-                </span>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setPage(p => Math.max(1, p - 1))}
-                    disabled={meta.current_page === 1}
-                    className="px-4 py-1.5 rounded"
-                    style={{
-                      background: 'var(--surface)',
-                      color: meta.current_page === 1 ? 'var(--text-faint)' : 'var(--text)',
-                      border: '1px solid rgba(232,224,208,0.12)',
-                      cursor: meta.current_page === 1 ? 'not-allowed' : 'pointer',
-                    }}
-                  >
-                    ← Prev
-                  </button>
-                  <button
-                    onClick={() => setPage(p => Math.min(meta.last_page, p + 1))}
-                    disabled={meta.current_page === meta.last_page}
-                    className="px-4 py-1.5 rounded"
-                    style={{
-                      background: 'var(--surface)',
-                      color: meta.current_page === meta.last_page ? 'var(--text-faint)' : 'var(--text)',
-                      border: '1px solid rgba(232,224,208,0.12)',
-                      cursor: meta.current_page === meta.last_page ? 'not-allowed' : 'pointer',
-                    }}
-                  >
-                    Next →
-                  </button>
-                </div>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            )}
-          </>
-        )}
+            </div>
+          )}
+        </section>
+
+        {/* All games table */}
+        <section>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-base font-semibold" style={{ fontFamily: 'var(--font-playfair)', color: 'var(--text)' }}>
+              All games
+            </h2>
+            <span className="text-xs uppercase tracking-wider" style={{ color: 'var(--text-faint)' }}>
+              {GAME_TYPE_OPTIONS.find(option => option.value === (gameTypeFilter ?? 'all'))?.label}
+            </span>
+          </div>
+
+          {gamesLoading ? (
+            <p style={{ color: 'var(--text-muted)' }}>Loading games…</p>
+          ) : games.length === 0 ? (
+            <div className="p-8 rounded text-center" style={{ background: 'var(--surface)', border: '1px solid rgba(232,224,208,0.10)' }}>
+              <p style={{ color: 'var(--text-muted)' }}>No games imported yet. Press Sync Now to fetch your latest games.</p>
+            </div>
+          ) : (
+            <>
+              <div className="rounded overflow-hidden mb-6" style={{ border: '1px solid rgba(232,224,208,0.10)' }}>
+                <table className="w-full text-sm" style={{ borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: 'var(--surface)', borderBottom: '1px solid rgba(232,224,208,0.10)' }}>
+                      {['Result', 'Opponent', 'Time control', 'Blunders', 'Status', ''].map(h => (
+                        <th
+                          key={h}
+                          className="text-left px-4 py-3 text-xs uppercase tracking-wider"
+                          style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap' }}
+                        >
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {games.map((g, i) => {
+                      const status = STATUS_STYLES[g.analysis_status] ?? STATUS_STYLES.pending
+                      return (
+                        <tr
+                          key={g.id}
+                          style={{ borderBottom: i < games.length - 1 ? '1px solid rgba(232,224,208,0.06)' : undefined }}
+                        >
+                          <td className="px-4 py-3 font-medium" style={{ color: 'var(--text)', fontFamily: 'var(--font-dm-mono)' }}>
+                            {RESULT_LABEL[g.result] ?? '—'}
+                          </td>
+                          <td className="px-4 py-3" style={{ color: 'var(--text-muted)' }}>
+                            {g.opponent_username ?? '—'}
+                            {g.opponent_rating != null && (
+                              <span className="ml-1.5" style={{ color: 'var(--text-faint)', fontSize: '11px', fontFamily: 'var(--font-dm-mono)' }}>
+                                ({g.opponent_rating})
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-dm-mono)', fontSize: '12px' }}>
+                            {g.time_control ?? '—'}
+                          </td>
+                          <td className="px-4 py-3 font-medium" style={{ color: g.blunder_count != null && g.blunder_count > 0 ? '#f87171' : 'var(--text-muted)', fontFamily: 'var(--font-dm-mono)' }}>
+                            {g.blunder_count ?? (g.analysis_status === 'complete' ? '0' : '—')}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <span className="text-xs" style={{ color: status.color }}>{status.label}</span>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            {g.share_code && (
+                              <Link
+                                href={`/g/${g.share_code}`}
+                                className="text-xs px-3 py-1 rounded"
+                                style={{ color: 'var(--gold)', border: '1px solid rgba(201,168,76,0.3)' }}
+                              >
+                                View →
+                              </Link>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {meta && meta.last_page > 1 && (
+                <div className="flex items-center justify-between text-sm">
+                  <span style={{ color: 'var(--text-muted)' }}>
+                    Page {meta.current_page} of {meta.last_page}
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      disabled={meta.current_page === 1}
+                      className="px-4 py-1.5 rounded"
+                      style={{
+                        background: 'var(--surface)',
+                        color: meta.current_page === 1 ? 'var(--text-faint)' : 'var(--text)',
+                        border: '1px solid rgba(232,224,208,0.12)',
+                        cursor: meta.current_page === 1 ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      ← Prev
+                    </button>
+                    <button
+                      onClick={() => setPage(p => Math.min(meta.last_page, p + 1))}
+                      disabled={meta.current_page === meta.last_page}
+                      className="px-4 py-1.5 rounded"
+                      style={{
+                        background: 'var(--surface)',
+                        color: meta.current_page === meta.last_page ? 'var(--text-faint)' : 'var(--text)',
+                        border: '1px solid rgba(232,224,208,0.12)',
+                        cursor: meta.current_page === meta.last_page ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      Next →
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </section>
       </main>
     </>
   )

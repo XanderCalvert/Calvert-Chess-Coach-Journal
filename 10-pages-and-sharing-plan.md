@@ -243,11 +243,11 @@ Potentially disable:
 
 ### Chess.com Integration
 
-Potential features:
-- Import by URL
-- Sync account games
-- Scheduled imports
-- Rating tracking
+**Shipped (May 2026):** username-based connected profile (`/u/{username}`), archive sync (recent window in UI; full history via CLI), rating fields on account, deduped imports. See [11-profile-plan.md](./11-profile-plan.md), [ADMIN-GUIDE.md](./ADMIN-GUIDE.md).
+
+Still potential:
+- Import by single-game URL
+- Scheduled / automatic sync
 
 ### Lichess Integration
 
@@ -296,22 +296,27 @@ Expose to frontend
 
 ---
 
-## Current Progress
+## Current progress (May 2026)
 
 ### Completed
-- Laravel Herd migration
-- Next ↔ Laravel communication
-- PostgreSQL connection
-- PGN importing
-- Game persistence
-- Seeders partially working
+- [x] Next.js ↔ Laravel (BFF under `apps/web/app/api/...`)
+- [x] PostgreSQL + game/move persistence, queues
+- [x] PGN import (`/import`, API `POST /api/v1/games`)
+- [x] Stockfish analysis jobs; classifications; move-level data
+- [x] Game analysis experience: `/g/{share_code}`, `?ply=N`, board + move list + move detail
+- [x] Games list `/games`
+- [x] **Public share path:** `/g/{code}` (short **share_code**); *this doc’s `/share/{slug}-{id}` pattern is not the implemented contract*
+- [x] **Chess.com profile:** `/u/{username}` — connected account, sync, imported games, analysis trends, game-type filter
+- [x] Operator CLI: `chess:sync-connected-account` (see [ADMIN-GUIDE.md](./ADMIN-GUIDE.md))
 
-### Immediate Next Tasks (High Priority)
-- Make seeders idempotent
-- Add Stockfish locally
-- Create game analysis page
-- Build move storage system
-- Queue analysis jobs
+### Still open (vs this doc)
+- [ ] Homepage polish as specified (hero, example analysis)
+- [ ] `/games/[id]` as canonical ID route in nav (UUID route exists under `/games/.../analysis`)
+- [ ] `/games/[id]/review` training mode
+- [ ] `/patterns` pattern tracking page
+- [ ] `/profile` settings (explanation depth, linked accounts UI beyond profile page)
+- [ ] `/about` build page
+- [ ] Lichess integration
 
 ---
 

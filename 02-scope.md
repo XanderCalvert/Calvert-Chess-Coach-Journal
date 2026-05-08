@@ -61,7 +61,7 @@
 ---
 
 ## What to Avoid Initially
-- Chess.com / Lichess import (Phase 1)
+- **Lichess** import (Phase 1 — **Chess.com** username/archive import is now in scope and implemented)
 - Puzzle generation (Phase 2)
 - Voice commentary, club presentation mode (stretch)
 - Opening database lookup (Phase 1 at earliest)

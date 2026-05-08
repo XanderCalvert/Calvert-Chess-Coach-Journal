@@ -2,7 +2,7 @@
 
 Tick `- [ ]` → `- [x]` as you complete items. In GitHub or many editors, checkboxes are clickable.
 
-> **Repo snapshot (May 2026):** Full import-to-analysis pipeline is working end-to-end. PGN import (UI + API), Stockfish analysis via queued jobs, per-move centipawn evaluation, blunder/mistake/inaccuracy classification, interactive board viewer with move navigation and keyboard shortcuts, games list, public share links (`/g/{code}`) with deep-link ply support (`?ply=N`). Auth, LLM explanations, and trend tracking are still outstanding.
+> **Repo snapshot (May 2026):** Full **PGN → analyse → review** loop works: import (UI + API), Stockfish via queues, CP loss + classifications, interactive `/g/{share_code}` with `?ply=N`, games list. **Chess.com profiles:** `connected_accounts`, `/u/{username}`, web sync (20-game window), query-time stats + sparklines, game-type filter, `ImportExternalGameJob` dedup. **Operators:** `chess:sync-connected-account` for full-archive pulls ([ADMIN-GUIDE.md](./ADMIN-GUIDE.md)). Still outstanding: auth, LLM key-moment explanations, heuristic tags in UI, dedicated dashboard/trends pages, club notes, production deploy.
 
 ---
 
@@ -117,13 +117,13 @@ Get these working first, in order:
 
 **Progress (tick as you go):**
 
-- [ ] **M1 — Foundation:** Project scaffold, auth, database schema, PGN parse to Moves table
+- [x] **M1 — Foundation (partial):** Project scaffold, database schema, PGN parse to Moves table; **auth** still open
 - [x] **M2 — Engine:** Stockfish worker, centipawn evaluation, classification, move-level key moments
 - [ ] **M3 — Heuristic Tags:** Rule-based mistake tagging for 5 MVP tags
 - [ ] **M4 — Explanations:** LLM API integration, prompt template, explanation stored and displayed
 - [ ] **M5 — Game UI:** Analysis page with board, key moment cards, played vs best move view *(board + move list done; key moment cards and explanations outstanding)*
 - [ ] **M6 — Summary + Notes:** Game summary generation, manual notes, coach agreement toggle
-- [ ] **M7 — Trends MVP:** Trend summary computed, simple trends page with table and chart
+- [ ] **M7 — Trends MVP:** Dedicated trends page + stored summaries still open; **partial:** `/u/{username}` profile stats + sparklines for analysed games on a connected Chess.com account
 - [ ] **M8 — Dashboard:** Dashboard with stat cards, recent games list, study recommendation
 - [ ] **M9 — Polish:** Error states, empty states, loading indicators, responsive fixes
 - [ ] **M10 — Launch:** Deploy to Fly.io / Railway, write README, document architecture
@@ -143,7 +143,7 @@ Get these working first, in order:
 
 **Progress (tick as you go):**
 
-- [ ] **P1-M1 — Import:** Chess.com and Lichess API import with deduplication
+- [x] **P1-M1 — Import:** Chess.com public archive import with deduplication; UI sync (recent window) + CLI full/history sync; Lichess **not** implemented yet
 - [ ] **P1-M2 — Recurring Mistakes:** Detect recurring mistake tags across 20+ games
 - [ ] **P1-M3 — Opening Awareness:** ECO tracking, accuracy by opening
 - [ ] **P1-M4 — Dashboard v2:** Trend comparison (last 5 vs previous 5 games)

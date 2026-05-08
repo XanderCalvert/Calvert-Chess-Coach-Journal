@@ -1,5 +1,7 @@
 # Chess Coach Journal — Mistake Taxonomy
 
+**Status (May 2026):** Tags are **seeded** in the database; **heuristic assignment to key moments** and user override in the analysis UI are **not** shipped yet.
+
 ## Tag Reference
 
 | Tag | Slug | Phase Hint | Description |

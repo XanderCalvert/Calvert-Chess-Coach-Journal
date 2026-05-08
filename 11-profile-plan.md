@@ -208,7 +208,7 @@ apps/api/routes/api.php
 
 ---
 
-## Phase 2 — Player Profiles MVP ← CURRENT FOCUS
+## Phase 2 — Player Profiles MVP ✅ Done (baseline)
 
 ### Goal
 
@@ -273,8 +273,10 @@ id
 user_id nullable (for now)
 platform enum: chesscom, lichess
 username
+normalised_username (unique with platform)
 external_id nullable
 profile_url nullable
+rapid_rating, blitz_rating, bullet_rating, daily_rating nullable (from Chess.com stats API)
 last_synced_at nullable
 sync_status enum: never_synced, syncing, synced, failed
 created_at
@@ -318,7 +320,7 @@ result enum nullable
 
 ---
 
-## Phase 3 — Chess.com Game Sync
+## Phase 3 — Chess.com Game Sync ✅ Done
 
 ### Goal
 
@@ -326,7 +328,7 @@ Allow the app to fetch public Chess.com games for a username and import them aut
 
 ### MVP Sync Scope
 
-Chess.com only. No OAuth — use public username-based archive access.
+Chess.com only. No OAuth — public username-based archive access.
 
 ### Sync Flow
 
@@ -334,53 +336,54 @@ Chess.com only. No OAuth — use public username-based archive access.
 User enters Chess.com username
 → app creates/updates connected account
 → app fetches monthly game archives
-→ app imports recent games
+→ app imports recent games (UI) or full history (CLI)
 → imported games are queued for analysis
-→ profile stats update after analysis completes
+→ profile stats update after analysis completes (query-time aggregation)
 ```
 
 ### Sync Controls
 
-Profile page should include:
+Profile page includes:
 
-* sync now button
-* last synced timestamp
-* sync status
-* basic error message if sync fails
+- [x] Sync now button
+- [x] Last synced timestamp
+- [x] Sync status
+- [x] Basic error message if sync fails
 
-### Initial Sync Limit
+### Sync Limits
 
-* import latest 20 games first, or
-* import latest calendar month first
+- [x] **Web / API job (default):** latest **20** games across archive months (`SyncChessComAccountJob` with `fullArchive = false`)
+- [x] **CLI:** full archive or same 20-game window — `chess:sync-connected-account` ([ADMIN-GUIDE.md](./ADMIN-GUIDE.md))
 
 ### Jobs
 
 ```text
-SyncChessComAccountJob
+SyncChessComAccountJob   (ratings + archives; optional fullArchive)
 ImportExternalGameJob
-AnalyseGameJob (already exists)
-RefreshPlayerStatsJob
+AnalyseGameJob
 ```
+
+Player stats are computed in `ConnectedAccountController::statsByUsername` (no separate refresh job).
 
 ### External Game Deduplication
 
 Unique key:
 
 ```text
-platform + external_game_id
+connected account + Chess.com game uuid (stored as external_id on games)
 ```
 
 ### Acceptance Criteria
 
-* User can enter a Chess.com username
-* App imports recent games without duplicate records
-* Imported games are queued for Stockfish analysis
-* Sync can be re-run safely
-* Profile page shows updated game count after sync
+- [x] User can enter a Chess.com username
+- [x] App imports recent games without duplicate records
+- [x] Imported games are queued for Stockfish analysis
+- [x] Sync can be re-run safely
+- [x] Profile page shows updated game count after sync
 
 ---
 
-## Phase 4 — Player Trend Dashboard
+## Phase 4 — Player Trend Dashboard ✅ Mostly done (on profile)
 
 ### Goal
 
@@ -440,10 +443,13 @@ rating_start / rating_end
 
 ### Acceptance Criteria
 
-* Profile dashboard displays analysed game trends
-* Stats update after games are imported and analysed
-* User can quickly tell whether blunders/mistakes are improving
-* Recent games link to `/g/{share_code}`
+- [x] Profile dashboard displays analysed game trends (aggregates + sparklines for rating, avg CPL, blunders/game)
+- [x] Stats update after games are imported and analysed (query-time; refresh after sync)
+- [x] Game-type filter (bullet / blitz / rapid / daily) scopes stats and game list; dropdown hides empty types and defaults to most-played analysed bucket
+- [x] User can quickly tell whether blunders/mistakes are improving (per-filter aggregates)
+- [x] Recent analysed games link to `/g/{share_code}`
+- [ ] Cached `player_stat_snapshots` table (optional optimisation — not required yet)
+- [ ] “Most common mistake type” / phase / opening theme cards (needs tagging pipeline)
 
 ---
 
@@ -592,36 +598,24 @@ This week:
 
 ## Suggested Build Order
 
-### Current Branch (feature/analysis-page)
-
-Done:
+### Done
 
 1. ✅ Public `/g/{share_code}` URLs
 2. ✅ `?ply=N` deep linking
 3. ✅ Hide UUIDs from normal UI
-4. ✅ Polish game analysis page (keyboard nav, board orientation, move detail panel, share buttons)
+4. ✅ Game analysis page (keyboard nav, board orientation, move detail, share buttons)
+5. ✅ `connected_accounts` + extended `games` metadata
+6. ✅ `POST /api/v1/connected-accounts`, profile `/u/[username]`
+7. ✅ `SyncChessComAccountJob`, `ImportExternalGameJob`, dedup, web + CLI sync
+8. ✅ Profile stats API + UI (W/D/L, CPL, mistakes, sparklines, recent games, game-type filter)
 
-Up next (Phase 2):
+### Next up
 
-5. Profile data model — `connected_accounts` migration + model
-6. Extend `games` table with player/match metadata fields
-7. Manual Chess.com username entry — `POST /api/v1/connected-accounts`
-8. Basic profile page `/u/[username]`
-
-### Next Branch
-
-1. Chess.com sync job (`SyncChessComAccountJob`)
-2. Recent game import with deduplication
-3. Auto-analysis queue integration
-4. Profile recent games feed
-
-### Later Branch
-
-1. Trend dashboard
-2. Aggregated stats
-3. Mistake categories
-4. Focus areas
-5. AI explanations
+1. Heuristic / LLM key-moment explanations and tags (see [09-build-roadmap.md](./09-build-roadmap.md))
+2. Auth + user-owned games
+3. Dedicated global dashboard / `/patterns` (beyond per-profile aggregates)
+4. Lichess archive sync
+5. Focus areas + coaching summary (Phase 6) once tagging exists
 
 ---
 
@@ -634,11 +628,11 @@ Later: user accounts can claim/manage profiles.
 
 ### Chess.com vs Lichess
 
-Chess.com first. Design `connected_accounts.platform` so Lichess can be added later.
+Chess.com public sync is **implemented** (`SyncChessComAccountJob`, profile + CLI). `connected_accounts.platform` remains ready for Lichess later.
 
 ### Analysis Volume
 
-Newest 20 games first. Allow manual backfill later.
+Web sync: newest **20** games. **Full archive:** `chess:sync-connected-account` without `--recent` ([ADMIN-GUIDE.md](./ADMIN-GUIDE.md)).
 
 ### Public vs Private Profiles
 
@@ -658,9 +652,9 @@ This feature branch is successful if the app can:
 2. ✅ Show it on a polished interactive board
 3. ✅ Share the game via `/g/{share_code}`
 4. ✅ Link to a specific position with `?ply=N`
-5. Create a player profile from a Chess.com username
-6. Show that player's recent analysed games
-7. Start surfacing useful trends about their play
+5. ✅ Create a player profile from a Chess.com username (`/u/{username}`, `connected_accounts`)
+6. ✅ Show that player's recent analysed games and sync more from Chess.com
+7. ✅ Surface useful **aggregate** trends (stats + sparklines; game-type filter)
 
 At that point, the project has moved from:
 

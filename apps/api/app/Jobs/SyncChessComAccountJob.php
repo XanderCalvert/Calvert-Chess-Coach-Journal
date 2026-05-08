@@ -21,6 +21,8 @@ class SyncChessComAccountJob implements ShouldQueue
 
     public function __construct(
         public readonly string $connectedAccountId,
+        /** When true, queue imports for every game in every archive month; when false, same cap as web sync (recent window). */
+        public readonly bool $fullArchive = false,
     ) {}
 
     public function handle(): void
@@ -72,27 +74,38 @@ class SyncChessComAccountJob implements ShouldQueue
             return;
         }
 
-        // Walk archives newest→oldest, collecting up to 20 games across months
-        $reversedArchives = array_reverse($archives);
-        $recent = [];
+        if ($this->fullArchive) {
+            foreach (array_reverse($archives) as $archiveUrl) {
+                $gamesResponse = $http->get($archiveUrl);
+                $gamesResponse->throw();
 
-        foreach ($reversedArchives as $archiveUrl) {
-            $gamesResponse = $http->get($archiveUrl);
-            $gamesResponse->throw();
-
-            $monthGames = $gamesResponse->json('games', []);
-
-            // Prepend so the final list is still oldest→newest within the batch
-            $needed = 20 - count($recent);
-            $recent = array_merge(array_slice($monthGames, -$needed), $recent);
-
-            if (count($recent) >= 20) {
-                break;
+                foreach ($gamesResponse->json('games', []) as $game) {
+                    ImportExternalGameJob::dispatch($account->id, $game);
+                }
             }
-        }
+        } else {
+            // Walk archives newest→oldest, collecting up to 20 games across months (web sync parity)
+            $reversedArchives = array_reverse($archives);
+            $recent = [];
 
-        foreach ($recent as $game) {
-            ImportExternalGameJob::dispatch($account->id, $game);
+            foreach ($reversedArchives as $archiveUrl) {
+                $gamesResponse = $http->get($archiveUrl);
+                $gamesResponse->throw();
+
+                $monthGames = $gamesResponse->json('games', []);
+
+                // Prepend so the final list is still oldest→newest within the batch
+                $needed = 20 - count($recent);
+                $recent = array_merge(array_slice($monthGames, -$needed), $recent);
+
+                if (count($recent) >= 20) {
+                    break;
+                }
+            }
+
+            foreach ($recent as $game) {
+                ImportExternalGameJob::dispatch($account->id, $game);
+            }
         }
 
         $account->update([

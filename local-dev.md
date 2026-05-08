@@ -154,3 +154,14 @@ cd "F:\CalvertChess\Calvert Chess Coach Journal\apps\web"
 npm run lint
 npm run build
 ```
+
+## Operators (imports & queues)
+
+Background jobs (analysis, Chess.com imports) need a worker unless `QUEUE_CONNECTION=sync`:
+
+```powershell
+cd "F:\CalvertChess\Calvert Chess Coach Journal\apps\api"
+php artisan queue:work
+```
+
+Bulk Chess.com sync and other CLI commands: [ADMIN-GUIDE.md](./ADMIN-GUIDE.md).

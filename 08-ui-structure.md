@@ -1,5 +1,23 @@
 # Chess Coach Journal — UI Structure
 
+## As built (May 2026)
+
+Rough mapping to this doc:
+
+| Doc screen | In app today |
+|------------|----------------|
+| Game Import | `/import` — PGN paste, submit |
+| Game List | `/games` — list with status |
+| Game Detail / Replay | `/g/{share_code}` (primary); `/games/{id}/analysis` still available |
+| Dashboard | Not a dedicated page yet |
+| Trends | Not `/patterns`; **profile** `/u/{username}` shows aggregate trends for a linked Chess.com account |
+| Profile (settings) | Not `/profile`; external identity is **Chess.com username** on `/u/{username}` |
+| Key moment cards / explanations | Board + move detail; LLM explanation cards not wired |
+
+Layout: **Nav** component drives top/side navigation (not necessarily a 220px left sidebar as specified below).
+
+---
+
 ## Layout Principles
 
 - Desktop-first; responsive for tablet/mobile from Phase 1

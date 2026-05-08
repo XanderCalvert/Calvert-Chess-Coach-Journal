@@ -5,7 +5,6 @@ export async function GET(
   { params }: { params: Promise<{ platform: string; username: string }> }
 ) {
   const { platform, username } = await params
-  const page = request.nextUrl.searchParams.get('page') ?? '1'
   const gameType = request.nextUrl.searchParams.get('game_type') ?? 'all'
 
   const laravelUrl = process.env.LARAVEL_API_URL
@@ -16,7 +15,7 @@ export async function GET(
   let res: Response
   try {
     res = await fetch(
-      `${laravelUrl}/api/v1/connected-accounts/by-username/${platform}/${username}/games?page=${page}&game_type=${encodeURIComponent(gameType)}`,
+      `${laravelUrl}/api/v1/connected-accounts/by-username/${platform}/${username}/stats?game_type=${encodeURIComponent(gameType)}`,
       { headers: { Accept: 'application/json' } }
     )
   } catch (err) {

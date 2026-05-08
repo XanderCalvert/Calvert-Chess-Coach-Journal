@@ -88,6 +88,40 @@ Seeds a development user, submits a representative PGN-derived payload, and vali
 
 ---
 
+## Feature — connected account profile stats and filters
+
+**File:** [`Feature/ConnectedAccountStatsTest.php`](Feature/ConnectedAccountStatsTest.php)
+
+| Test | What it verifies |
+|------|------------------|
+| `test_returns_404_for_unknown_username` | Stats endpoint returns `404` for unknown connected-account usernames. |
+| `test_returns_zeroed_stats_when_no_analysed_games` | No complete games returns a stable zero/null stats contract, empty trend arrays, zero `analysed_counts_by_type`, and `recommended_game_type` null. |
+| `test_derives_win_loss_draw_from_board_result_and_user_colour` | W/D/L counters are computed from tracked-player perspective, not raw board winner only. |
+| `test_avg_cp_loss_uses_only_tracked_player_colour_moves` | Avg CPL excludes opponent moves and uses only tracked-player move rows. |
+| `test_avg_cp_loss_excludes_games_with_no_analysed_moves` | Games without analysed move CPL do not drag average toward zero. |
+| `test_rating_trend_uses_user_rating_after_with_fallback` | Rating trend prefers `user_rating_after` and falls back to `user_rating_before`. |
+| `test_recent_games_derives_result_from_player_perspective` | Recent games list returns player-relative `WIN/LOSS/DRAW` and expected share-code payload. |
+| `test_returns_correct_aggregate_stats` | Blunder/mistake/inaccuracy averages and analysed count are aggregated correctly. |
+| `test_stats_can_be_filtered_by_game_type` | `game_type` query filter scopes stats aggregates to bullet/blitz/rapid/daily buckets. |
+| `test_games_endpoint_can_be_filtered_by_game_type` | Connected-account games endpoint respects `game_type` filtering for listed games. |
+| `test_analysed_counts_and_recommended_type_use_time_control_buckets` | `analysed_counts_by_type` buckets complete games by time control; `recommended_game_type` picks the largest bucket. |
+| `test_recommended_type_breaks_ties_in_fixed_order` | When two buckets tie for the max count, `recommended_game_type` uses a deterministic order (bullet, then blitz, then rapid, then daily). |
+
+---
+
+## Feature — `chess:sync-connected-account` and Chess.com archive sync
+
+**File:** [`Feature/SyncConnectedAccountCommandTest.php`](Feature/SyncConnectedAccountCommandTest.php)
+
+| Test | What it verifies |
+|------|------------------|
+| `test_full_archive_queues_all_games_across_months` | `SyncChessComAccountJob` with full archive walks every month and queues one `ImportExternalGameJob` per game. |
+| `test_recent_window_caps_at_twenty_from_newest_months` | Recent-window mode matches the web sync cap (20 games, newest months first). |
+| `test_command_requires_account_without_create` | Command fails when no `connected_accounts` row exists and `--create` is not passed. |
+| `test_command_create_option_inserts_row_and_dispatches_job` | `--create` upserts a row and dispatches the sync job to the queue. |
+
+---
+
 ## Feature — analysis job behavior and command wiring
 
 **Files:** [`Feature/AnalyseGameJobTest.php`](Feature/AnalyseGameJobTest.php), [`Feature/AnalyseGameCommandTest.php`](Feature/AnalyseGameCommandTest.php), [`Feature/ReanalyseGamesCommandTest.php`](Feature/ReanalyseGamesCommandTest.php)

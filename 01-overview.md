@@ -1,5 +1,7 @@
 # Chess Coach Journal — Product Overview
 
+**Build status (May 2026):** The **evaluate + replay + share** loop and **Chess.com profile imports** are in the codebase; **explain** (LLM) and **club notes** pillars are still largely ahead. See [00-index.md](./00-index.md).
+
 ## App Name
 Chess Coach Journal
 
