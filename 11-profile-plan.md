@@ -288,16 +288,14 @@ updated_at
 ```text
 connected_account_id nullable FK
 platform enum nullable
-external_game_id nullable
-played_at nullable
+external_id nullable
+share_code nullable unique (8-char)
 time_control nullable
 rated boolean nullable
-user_colour enum nullable
 user_rating_before nullable
 user_rating_after nullable
 opponent_username nullable
 opponent_rating nullable
-result enum nullable
 ```
 
 ### Acceptance Criteria

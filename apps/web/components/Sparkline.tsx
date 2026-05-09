@@ -6,9 +6,10 @@ interface SparklineProps {
   data: readonly number[];
   minValue?: number;
   maxValue?: number;
+  getPointColor?: (value: number) => string;
 }
 
-export default function Sparkline({ data, minValue = 50, maxValue = 90 }: SparklineProps) {
+export default function Sparkline({ data, minValue = 50, maxValue = 90, getPointColor }: SparklineProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -66,10 +67,10 @@ export default function Sparkline({ data, minValue = 50, maxValue = 90 }: Sparkl
       ctx.lineWidth = 1.5;
       ctx.stroke();
 
-      data.forEach((_, i) => {
+      data.forEach((value, i) => {
         ctx.beginPath();
         ctx.arc(xs[i], ys[i], 3, 0, Math.PI * 2);
-        ctx.fillStyle = "#c9a84c";
+        ctx.fillStyle = getPointColor ? getPointColor(value) : "#c9a84c";
         ctx.fill();
       });
     }
@@ -79,7 +80,7 @@ export default function Sparkline({ data, minValue = 50, maxValue = 90 }: Sparkl
     const ro = new ResizeObserver(draw);
     ro.observe(container);
     return () => ro.disconnect();
-  }, [data, minValue, maxValue]);
+  }, [data, minValue, maxValue, getPointColor]);
 
   return (
     <div ref={containerRef} className="w-full" style={{ height: 60 }}>

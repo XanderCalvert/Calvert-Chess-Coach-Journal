@@ -164,12 +164,18 @@ class ConnectedAccountController extends Controller
                     'draws'                 => 0,
                     'losses'                => 0,
                     'avg_cp_loss'           => null,
+                    'median_cp_loss'        => null,
                     'blunders_per_game'     => null,
+                    'median_blunders_per_game' => null,
                     'mistakes_per_game'     => null,
+                    'median_mistakes_per_game' => null,
                     'inaccuracies_per_game' => null,
+                    'median_inaccuracies_per_game' => null,
                     'rating_trend'          => [],
                     'cp_loss_trend'         => [],
                     'blunders_trend'        => [],
+                    'mistakes_trend'        => [],
+                    'inaccuracies_trend'    => [],
                     'recent_games'          => [],
                 ], $typeMeta));
             }
@@ -189,12 +195,18 @@ class ConnectedAccountController extends Controller
                 'draws'                 => 0,
                 'losses'                => 0,
                 'avg_cp_loss'           => null,
+                'median_cp_loss'        => null,
                 'blunders_per_game'     => null,
+                'median_blunders_per_game' => null,
                 'mistakes_per_game'     => null,
+                'median_mistakes_per_game' => null,
                 'inaccuracies_per_game' => null,
+                'median_inaccuracies_per_game' => null,
                 'rating_trend'          => [],
                 'cp_loss_trend'         => [],
                 'blunders_trend'        => [],
+                'mistakes_trend'        => [],
+                'inaccuracies_trend'    => [],
                 'recent_games'          => [],
             ], $typeMeta));
         }
@@ -229,6 +241,35 @@ class ConnectedAccountController extends Controller
             ->avg('moves.cp_loss');
         $avgCpLoss = $rawAvgCpl !== null ? round($rawAvgCpl, 1) : null;
 
+        $cpLossByGame = DB::table('games')
+            ->join('moves', function ($join) {
+                $join->on('moves.game_id', '=', 'games.id')
+                     ->on('moves.colour', '=', 'games.user_colour')
+                     ->whereNotNull('moves.cp_loss');
+            })
+            ->where('games.connected_account_id', $account->id)
+            ->where('games.analysis_status', AnalysisStatus::Complete->value)
+            ->when($matchingIds !== null, fn ($query) => $query->whereIn('games.id', $matchingIds))
+            ->when($cutoff !== null, fn ($query) => $query->where('games.played_at', '>=', $cutoff))
+            ->select('games.id', 'games.played_at', DB::raw('AVG(moves.cp_loss) as avg_cp_loss'))
+            ->groupBy('games.id', 'games.played_at')
+            ->orderBy('games.played_at')
+            ->get();
+
+        $medianCpLoss = $this->median(
+            $cpLossByGame
+                ->pluck('avg_cp_loss')
+                ->map(fn ($value) => (float) $value)
+        );
+
+        $blunderValues = (clone $base)->whereNotNull('blunder_count')->pluck('blunder_count');
+        $mistakeValues = (clone $base)->whereNotNull('mistake_count')->pluck('mistake_count');
+        $inaccuracyValues = (clone $base)->whereNotNull('inaccuracy_count')->pluck('inaccuracy_count');
+
+        $medianBlundersPerGame = $this->median($blunderValues);
+        $medianMistakesPerGame = $this->median($mistakeValues);
+        $medianInaccuraciesPerGame = $this->median($inaccuracyValues);
+
         // Rating trend: last 30 complete games that have at least one rating value.
         $ratingTrend = (clone $base)
             ->where(fn ($q) => $q->whereNotNull('user_rating_after')->orWhereNotNull('user_rating_before'))
@@ -242,21 +283,8 @@ class ConnectedAccountController extends Controller
             ->values();
 
         // CPL trend: per-game avg cp_loss for user's colour, last 30 games with analysed moves.
-        $cpLossTrend = DB::table('games')
-            ->join('moves', function ($join) {
-                $join->on('moves.game_id', '=', 'games.id')
-                     ->on('moves.colour', '=', 'games.user_colour')
-                     ->whereNotNull('moves.cp_loss');
-            })
-            ->where('games.connected_account_id', $account->id)
-            ->where('games.analysis_status', AnalysisStatus::Complete->value)
-            ->when($matchingIds !== null, fn ($query) => $query->whereIn('games.id', $matchingIds))
-            ->when($cutoff !== null, fn ($query) => $query->where('games.played_at', '>=', $cutoff))
-            ->select('games.id', 'games.played_at', DB::raw('AVG(moves.cp_loss) as avg_cp_loss'))
-            ->groupBy('games.id', 'games.played_at')
-            ->orderBy('games.played_at')
-            ->limit(30)
-            ->get()
+        $cpLossTrend = $cpLossByGame
+            ->take(-30)
             ->map(fn ($row) => [
                 'played_at'   => Carbon::parse($row->played_at)->toDateString(),
                 'avg_cp_loss' => round($row->avg_cp_loss, 1),
@@ -271,6 +299,26 @@ class ConnectedAccountController extends Controller
             ->map(fn ($g) => [
                 'played_at' => $g->played_at?->toDateString(),
                 'blunders'  => $g->blunder_count,
+            ])
+            ->values();
+
+        $mistakesTrend = (clone $base)
+            ->orderBy('played_at')
+            ->limit(30)
+            ->get(['played_at', 'mistake_count'])
+            ->map(fn ($g) => [
+                'played_at' => $g->played_at?->toDateString(),
+                'mistakes'  => $g->mistake_count,
+            ])
+            ->values();
+
+        $inaccuraciesTrend = (clone $base)
+            ->orderBy('played_at')
+            ->limit(30)
+            ->get(['played_at', 'inaccuracy_count'])
+            ->map(fn ($g) => [
+                'played_at'     => $g->played_at?->toDateString(),
+                'inaccuracies'  => $g->inaccuracy_count,
             ])
             ->values();
 
@@ -315,14 +363,41 @@ class ConnectedAccountController extends Controller
             'draws'                 => $draws,
             'losses'                => $losses,
             'avg_cp_loss'           => $avgCpLoss,
+            'median_cp_loss'        => $medianCpLoss !== null ? round($medianCpLoss, 1) : null,
             'blunders_per_game'     => $blundersPerGame,
+            'median_blunders_per_game' => $medianBlundersPerGame !== null ? round($medianBlundersPerGame, 1) : null,
             'mistakes_per_game'     => $mistakesPerGame,
+            'median_mistakes_per_game' => $medianMistakesPerGame !== null ? round($medianMistakesPerGame, 1) : null,
             'inaccuracies_per_game' => $inaccuraciesPerGame,
+            'median_inaccuracies_per_game' => $medianInaccuraciesPerGame !== null ? round($medianInaccuraciesPerGame, 1) : null,
             'rating_trend'          => $ratingTrend,
             'cp_loss_trend'         => $cpLossTrend,
             'blunders_trend'        => $blundersTrend,
+            'mistakes_trend'        => $mistakesTrend,
+            'inaccuracies_trend'    => $inaccuraciesTrend,
             'recent_games'          => $recentGamesFormatted,
         ], $typeMeta));
+    }
+
+    private function median(Collection $values): ?float
+    {
+        if ($values->isEmpty()) {
+            return null;
+        }
+
+        $sorted = $values
+            ->map(fn ($value) => (float) $value)
+            ->sort()
+            ->values();
+
+        $count = $sorted->count();
+        $middle = intdiv($count, 2);
+
+        if ($count % 2 === 0) {
+            return ($sorted[$middle - 1] + $sorted[$middle]) / 2;
+        }
+
+        return $sorted[$middle];
     }
 
     public function sync(string $platform, string $username): JsonResponse

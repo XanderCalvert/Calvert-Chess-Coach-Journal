@@ -65,6 +65,8 @@ interface AnalysedCountsByType {
 }
 
 interface TrendPoint { played_at: string; rating?: number; avg_cp_loss?: number; blunders?: number }
+interface MistakeTrendPoint { played_at: string; mistakes?: number }
+interface InaccuracyTrendPoint { played_at: string; inaccuracies?: number }
 
 interface RecentGame {
   share_code: string
@@ -81,12 +83,18 @@ interface ProfileStats {
   draws: number
   losses: number
   avg_cp_loss: number | null
+  median_cp_loss?: number | null
   blunders_per_game: number | null
+  median_blunders_per_game?: number | null
   mistakes_per_game: number | null
+  median_mistakes_per_game?: number | null
   inaccuracies_per_game: number | null
+  median_inaccuracies_per_game?: number | null
   rating_trend: TrendPoint[]
   cp_loss_trend: TrendPoint[]
   blunders_trend: TrendPoint[]
+  mistakes_trend?: MistakeTrendPoint[]
+  inaccuracies_trend?: InaccuracyTrendPoint[]
   recent_games: RecentGame[]
   analysed_counts_by_type?: AnalysedCountsByType
   recommended_game_type?: string | null
@@ -130,10 +138,10 @@ const GAME_TYPE_OPTIONS: Array<{ value: GameTypeFilter; label: string }> = [
 const STAT_HELP: Record<string, string> = {
   analysed: 'Number of games with completed analysis in the selected game type and timeframe.',
   wdl: 'Wins, draws, and losses from your perspective in analysed games (within the timeframe).',
-  avgCpl: 'Average centipawn loss on your moves only. Lower is better.',
-  blunders: 'Average number of blunders per analysed game.',
-  mistakes: 'Average number of mistakes per analysed game.',
-  inaccuracies: 'Average number of inaccuracies per analysed game.',
+  avgCpl: 'Median centipawn loss on your moves only (with timeframe trend). Lower is better.',
+  blunders: 'Median number of blunders per analysed game (with timeframe trend).',
+  mistakes: 'Median number of mistakes per analysed game (with timeframe trend).',
+  inaccuracies: 'Median number of inaccuracies per analysed game (with timeframe trend).',
 }
 
 function RatingStat({ label, value }: { label: string; value: number | null }) {
@@ -185,19 +193,20 @@ function StatCardSkeleton() {
   )
 }
 
-function SparklinePanel({ title, subtitle, data, minValue, maxValue }: {
+function SparklinePanel({ title, subtitle, data, minValue, maxValue, getPointColor }: {
   title: string
   subtitle: string
   data: number[]
   minValue: number
   maxValue: number
+  getPointColor?: (value: number) => string
 }) {
   return (
     <div className="p-4 rounded" style={{ background: 'var(--surface)', border: '1px solid rgba(232,224,208,0.10)' }}>
       <div className="text-xs uppercase tracking-wider mb-0.5" style={{ color: 'var(--text-muted)' }}>{title}</div>
       <div className="text-sm font-medium mb-3" style={{ fontFamily: 'var(--font-dm-mono)', color: 'var(--gold)' }}>{subtitle}</div>
       {data.length >= 2 ? (
-        <Sparkline data={data} minValue={minValue} maxValue={maxValue} />
+        <Sparkline data={data} minValue={minValue} maxValue={maxValue} getPointColor={getPointColor} />
       ) : (
         <div className="h-[60px] flex items-center justify-center text-xs" style={{ color: 'var(--text-faint)' }}>
           Not enough data
@@ -209,6 +218,13 @@ function SparklinePanel({ title, subtitle, data, minValue, maxValue }: {
 
 function fmt(n: number | null, decimals = 1): string {
   return n != null ? n.toFixed(decimals) : '—'
+}
+
+function fmtSignedDelta(n: number, decimals = 0): string {
+  const formatted = n.toFixed(decimals).replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1')
+  if (n > 0) return `+${formatted}`
+  if (n < 0) return formatted
+  return '±0'
 }
 
 function isGameTypeFilter(value: string | null): value is Exclude<GameTypeFilter, 'all'> {
@@ -443,11 +459,94 @@ export default function ProfilePage() {
   const ratingData = stats?.rating_trend.map(p => p.rating!).filter(v => v != null) ?? []
   const cpLossData  = stats?.cp_loss_trend.map(p => p.avg_cp_loss!) ?? []
   const blunderData = stats?.blunders_trend.map(p => p.blunders!) ?? []
+  const mistakeData = stats?.mistakes_trend?.map(p => p.mistakes!).filter(v => v != null) ?? []
+  const inaccuracyData = stats?.inaccuracies_trend?.map(p => p.inaccuracies!).filter(v => v != null) ?? []
+
+  const currentRating =
+    gameTypeFilter === 'rapid' ? account.rapid_rating
+      : gameTypeFilter === 'blitz' ? account.blitz_rating
+        : gameTypeFilter === 'bullet' ? account.bullet_rating
+          : gameTypeFilter === 'daily' ? account.daily_rating
+            : (ratingData.length ? ratingData[ratingData.length - 1] : null)
+
+  const ratingDelta = ratingData.length >= 2
+    ? ratingData[ratingData.length - 1] - ratingData[0]
+    : null
+
+  const cpLossDelta = cpLossData.length >= 2
+    ? cpLossData[cpLossData.length - 1] - cpLossData[0]
+    : null
+
+  const blunderDelta = blunderData.length >= 2
+    ? blunderData[blunderData.length - 1] - blunderData[0]
+    : null
+
+  const mistakeDelta = mistakeData.length >= 2
+    ? mistakeData[mistakeData.length - 1] - mistakeData[0]
+    : null
+
+  const inaccuracyDelta = inaccuracyData.length >= 2
+    ? inaccuracyData[inaccuracyData.length - 1] - inaccuracyData[0]
+    : null
+
+  const ratingSubtitle = currentRating == null
+    ? '—'
+    : ratingDelta == null
+      ? String(currentRating)
+      : `${currentRating} (${fmtSignedDelta(ratingDelta)})`
+
+  const cpLossCurrent = cpLossData.length ? cpLossData[cpLossData.length - 1] : null
+  const cpLossSubtitle = cpLossCurrent == null
+    ? '—'
+    : cpLossDelta == null
+      ? fmt(cpLossCurrent)
+      : `${fmt(cpLossCurrent)} (${fmtSignedDelta(cpLossDelta, 1)})`
+
+  const blunderCurrent = blunderData.length ? blunderData[blunderData.length - 1] : null
+  const blunderSubtitle = blunderCurrent == null
+    ? '—'
+    : blunderDelta == null
+      ? String(blunderCurrent)
+      : `${blunderCurrent} (${fmtSignedDelta(blunderDelta, 1)})`
+
+  const medianCpLossValue = stats?.median_cp_loss ?? null
+  const medianCpLossLabel = medianCpLossValue == null
+    ? '—'
+    : cpLossDelta == null
+      ? fmt(medianCpLossValue)
+      : `${fmt(medianCpLossValue)} (${fmtSignedDelta(cpLossDelta, 1)})`
+
+  const medianBlundersValue = stats?.median_blunders_per_game ?? null
+  const medianBlundersLabel = medianBlundersValue == null
+    ? '—'
+    : blunderDelta == null
+      ? fmt(medianBlundersValue, 1)
+      : `${fmt(medianBlundersValue, 1)} (${fmtSignedDelta(blunderDelta, 1)})`
+
+  const medianMistakesValue = stats?.median_mistakes_per_game ?? null
+  const medianMistakesLabel = medianMistakesValue == null
+    ? '—'
+    : mistakeDelta == null
+      ? fmt(medianMistakesValue, 1)
+      : `${fmt(medianMistakesValue, 1)} (${fmtSignedDelta(mistakeDelta, 1)})`
+
+  const medianInaccuraciesValue = stats?.median_inaccuracies_per_game ?? null
+  const medianInaccuraciesLabel = medianInaccuraciesValue == null
+    ? '—'
+    : inaccuracyDelta == null
+      ? fmt(medianInaccuraciesValue, 1)
+      : `${fmt(medianInaccuraciesValue, 1)} (${fmtSignedDelta(inaccuracyDelta, 1)})`
 
   const ratingMin = ratingData.length ? Math.max(0, Math.min(...ratingData) - 50) : 800
   const ratingMax = ratingData.length ? Math.max(...ratingData) + 50 : 1200
   const cpLossMax  = cpLossData.length  ? Math.max(Math.max(...cpLossData) + 20, 100) : 100
   const blunderMax = blunderData.length ? Math.max(Math.max(...blunderData) + 1, 5) : 5
+  const blunderPointColor = (value: number): string => {
+    if (value >= 10) return '#f87171'
+    if (value >= 6) return '#fb923c'
+    if (value === 0) return '#4ade80'
+    return '#c9a84c'
+  }
 
   if (loading) {
     return (
@@ -637,10 +736,10 @@ export default function ProfilePage() {
                     : '—'}
                   color="var(--text)"
                 />
-                <StatCard label="Avg CPL" helpText={STAT_HELP.avgCpl} value={fmt(stats?.avg_cp_loss ?? null, 1)} />
-                <StatCard label="Blunders/game" helpText={STAT_HELP.blunders} value={fmt(stats?.blunders_per_game ?? null)} />
-                <StatCard label="Mistakes/game" helpText={STAT_HELP.mistakes} value={fmt(stats?.mistakes_per_game ?? null)} />
-                <StatCard label="Inaccuracies/game" helpText={STAT_HELP.inaccuracies} value={fmt(stats?.inaccuracies_per_game ?? null)} />
+                <StatCard label="Median CPL" helpText={STAT_HELP.avgCpl} value={medianCpLossLabel} />
+                <StatCard label="Blunders/game" helpText={STAT_HELP.blunders} value={medianBlundersLabel} />
+                <StatCard label="Mistakes/game" helpText={STAT_HELP.mistakes} value={medianMistakesLabel} />
+                <StatCard label="Inaccuracies/game" helpText={STAT_HELP.inaccuracies} value={medianInaccuraciesLabel} />
               </>
             )}
           </div>
@@ -650,24 +749,25 @@ export default function ProfilePage() {
             <div className="grid grid-cols-1 gap-4 mb-6 sm:grid-cols-3">
               <SparklinePanel
                 title="Rating"
-                subtitle={ratingData.length ? String(ratingData[ratingData.length - 1]) : '—'}
+                subtitle={ratingSubtitle}
                 data={ratingData}
                 minValue={ratingMin}
                 maxValue={ratingMax}
               />
               <SparklinePanel
                 title="Avg CPL"
-                subtitle={cpLossData.length ? fmt(cpLossData[cpLossData.length - 1]) : '—'}
+                subtitle={cpLossSubtitle}
                 data={cpLossData}
                 minValue={0}
                 maxValue={cpLossMax}
               />
               <SparklinePanel
                 title="Blunders/game"
-                subtitle={blunderData.length ? String(blunderData[blunderData.length - 1]) : '—'}
+                subtitle={blunderSubtitle}
                 data={blunderData}
                 minValue={0}
                 maxValue={blunderMax}
+                getPointColor={blunderPointColor}
               />
             </div>
           )}

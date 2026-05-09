@@ -23,7 +23,8 @@ All tables use UUID primary keys. **Target:** data scoped to the authenticated u
 | Field | Type | Description |
 |-------|------|-------------|
 | `id` | UUID PK | |
-| `user_id` | FK → Users | |
+| `user_id` | FK → Users, nullable | Null for pre-auth external imports |
+| `connected_account_id` | FK → Connected Accounts, nullable | Source account for synced imports |
 | `pgn_raw` | text | Original PGN string |
 | `white_player` | string | From PGN headers |
 | `black_player` | string | From PGN headers |
@@ -41,7 +42,16 @@ All tables use UUID primary keys. **Target:** data scoped to the authenticated u
 | `analysis_status` | enum | `pending` \| `running` \| `complete` \| `failed` |
 | `imported_from` | enum | `paste` \| `chesscom` \| `lichess` |
 | `external_id` | string, nullable | For deduplication on import |
+| `share_code` | string(8), nullable, unique | Public `/g/{share_code}` URL key |
+| `platform` | string, nullable | Import source platform for profile flows |
+| `time_control` | string, nullable | e.g. `600+0`, `180+2` |
+| `rated` | boolean, nullable | Rated/casual when provided by source |
+| `user_rating_before` | smallint, nullable | Rating before game |
+| `user_rating_after` | smallint, nullable | Rating after game |
+| `opponent_username` | string, nullable | Opponent display/handle |
+| `opponent_rating` | smallint, nullable | Opponent rating at game time |
 | `created_at` | timestamp | |
+| `updated_at` | timestamp | |
 
 ---
 
@@ -60,6 +70,17 @@ All tables use UUID primary keys. **Target:** data scoped to the authenticated u
 | `cp_score` | integer | Centipawn evaluation after move |
 | `cp_loss` | integer | Difference vs best move |
 | `classification` | enum | `best` \| `excellent` \| `good` \| `inaccuracy` \| `mistake` \| `blunder` |
+| `themes` | JSON, nullable | Deterministic coaching themes |
+| `tactical_flags` | JSON, nullable | Tactical pattern flags |
+| `threat_awareness` | JSON, nullable | Threat-response summary object |
+| `risk_note` | text, nullable | Deterministic coach note |
+| `consecutive_miss_count` | smallint, nullable | Repeated threat-miss count |
+| `coaching_version` | smallint, nullable | Coaching schema/version marker |
+| `game_phase` | enum, nullable | `opening` \| `middlegame` \| `endgame` |
+| `complexity_score` | smallint, nullable | Position complexity hint |
+| `ai_explanation` | text, nullable | Cached AI move explanation |
+| `ai_explanation_status` | enum, nullable | `pending` \| `complete` \| `failed` |
+| `ai_explanation_model` | string(64), nullable | Model used for cached explanation |
 
 ---
 
@@ -69,10 +90,13 @@ All tables use UUID primary keys. **Target:** data scoped to the authenticated u
 |-------|------|-------------|
 | `id` | UUID PK | |
 | `move_id` | FK → Moves | |
+| `engine_name` | string | Engine identifier (default `stockfish`) |
 | `best_move_uci` | string | Engine's best move |
-| `best_move_san` | string | In algebraic notation |
+| `best_move_san` | string, nullable | In algebraic notation when available |
 | `best_line` | JSON | Array of SAN moves |
 | `depth` | integer | Stockfish search depth |
+| `depth_requested` | integer | Target depth requested by caller |
+| `depth_reached` | integer | Actual depth reached by engine |
 | `cp_evaluation` | integer | Raw centipawn score |
 | `analysed_at` | timestamp | |
 
@@ -91,6 +115,8 @@ All tables use UUID primary keys. **Target:** data scoped to the authenticated u
 | `explanation_text` | text | LLM-generated explanation |
 | `explanation_status` | enum | `pending` \| `complete` \| `failed` |
 | `game_phase` | enum | `opening` \| `middlegame` \| `endgame` |
+| `created_at` | timestamp | |
+| `updated_at` | timestamp | |
 
 ---
 
@@ -148,6 +174,7 @@ All tables use UUID primary keys. **Target:** data scoped to the authenticated u
 | `description_text` | text | How to study it |
 | `status` | enum | `active` \| `in_progress` \| `done` \| `dismissed` |
 | `created_at` | timestamp | |
+| `updated_at` | timestamp | |
 | `completed_at` | timestamp, nullable | |
 
 ---
@@ -169,10 +196,6 @@ All tables use UUID primary keys. **Target:** data scoped to the authenticated u
 | `daily_rating` | smallint, nullable | |
 | `last_synced_at` | timestamp, nullable | |
 | `sync_status` | string | `never_synced` \| `syncing` \| `synced` \| `failed` |
-
-**Games** (additional columns in migrations): `connected_account_id`, `platform`, `share_code`, `time_control`, `rated`, opponent and rating fields, etc. See `2026_05_08_000006_add_profile_fields_to_games_table.php` and related migrations.
-
----
 
 ## Implementation status (May 2026)
 
