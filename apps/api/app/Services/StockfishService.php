@@ -47,7 +47,7 @@ class StockfishService
     /**
      * Analyse a FEN position and return evaluation info.
      *
-     * @return array{best_move: string, cp: int, depth_reached: int, best_line: list<string>}
+     * @return array{best_move: string, cp: int, mate: int|null, depth_reached: int, best_line: list<string>}
      */
     public function analyse(string $fen): array
     {
@@ -55,6 +55,7 @@ class StockfishService
         $this->send("go depth {$this->depth}");
 
         $cp          = 0;
+        $mate        = null;
         $depthReached = 0;
         $bestLine    = [];
         $bestMove    = '';
@@ -84,9 +85,9 @@ class StockfishService
             $line = trim($line);
 
             if (str_starts_with($line, 'info depth')) {
-                $depthReached = $this->parseDepth($line);
-                $cp           = $this->parseCp($line, $cp);
-                $bestLine     = $this->parsePv($line);
+                $depthReached    = $this->parseDepth($line);
+                [$cp, $mate]     = $this->parseCpAndMate($line);
+                $bestLine        = $this->parsePv($line);
             }
 
             if (str_starts_with($line, 'bestmove')) {
@@ -101,10 +102,11 @@ class StockfishService
         }
 
         return [
-            'best_move'    => $bestMove,
-            'cp'           => $cp,
+            'best_move'     => $bestMove,
+            'cp'            => $cp ?? 0,
+            'mate'          => $mate,
             'depth_reached' => $depthReached,
-            'best_line'    => $bestLine,
+            'best_line'     => $bestLine,
         ];
     }
 

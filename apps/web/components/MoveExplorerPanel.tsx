@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Chess } from 'chess.js'
+import { useHintMode } from '@/contexts/HintModeContext'
 
 interface Candidate {
   rank: number
@@ -46,7 +47,20 @@ function uciToSan(chess: Chess, uci: string): string {
   }
 }
 
+function deriveConfidence(delta: number): 'high' | 'medium' | 'low' {
+  if (Math.abs(delta) <= 30)  return 'high'
+  if (Math.abs(delta) <= 80)  return 'medium'
+  return 'low'
+}
+
+const CONFIDENCE_STYLES: Record<string, { label: string; color: string }> = {
+  high:   { label: 'Strong',    color: '#4ade80' },
+  medium: { label: 'Solid',     color: '#facc15' },
+  low:    { label: 'Risky',     color: '#fb923c' },
+}
+
 export default function MoveExplorerPanel({ fen, onTryMove }: MoveExplorerPanelProps) {
+  const { hintMode } = useHintMode()
   const [state, setState]           = useState<PanelState>('loading')
   const [candidates, setCandidates] = useState<Candidate[]>([])
   const [sideToMove, setSideToMove] = useState<'white' | 'black' | null>(null)
@@ -209,9 +223,11 @@ export default function MoveExplorerPanel({ fen, onTryMove }: MoveExplorerPanelP
           // leave newFen as current fen if move fails
         }
 
-        const evalStr  = formatEval(candidate.cp, candidate.mate)
-        const delta    = candidate.cp !== null ? candidate.cp - rank1Eval : 0
-        const deltaStr = candidate.rank === 1 ? '' : (delta >= 0 ? `+${(delta / 100).toFixed(2)}` : (delta / 100).toFixed(2))
+        const evalStr   = formatEval(candidate.cp, candidate.mate)
+        const delta     = candidate.cp !== null ? candidate.cp - rank1Eval : 0
+        const deltaStr  = candidate.rank === 1 ? '' : (delta >= 0 ? `+${(delta / 100).toFixed(2)}` : (delta / 100).toFixed(2))
+        const confidence = deriveConfidence(delta)
+        const confStyle  = CONFIDENCE_STYLES[confidence]
         const isExpanded = expandedPv === candidate.rank
 
         return (
@@ -227,25 +243,46 @@ export default function MoveExplorerPanel({ fen, onTryMove }: MoveExplorerPanelP
             <div className="flex items-center gap-3">
               <span style={{ ...monoStyle, color: 'var(--text-faint)', width: 16 }}>{candidate.rank}.</span>
               <span style={{ ...monoStyle, color: 'var(--text)', fontWeight: 600, fontSize: 15 }}>{san}</span>
-              <span style={{ ...monoStyle, color: 'var(--gold)', marginLeft: 'auto' }}>{evalStr}</span>
-              {deltaStr && (
-                <span style={{ ...monoStyle, color: '#f87171', fontSize: 11 }}>{deltaStr}</span>
+
+              {/* Confidence badge — shown in guided + full */}
+              {hintMode !== 'training' && (
+                <span
+                  style={{ ...monoStyle, fontSize: 11, color: confStyle.color }}
+                >
+                  {confStyle.label}
+                </span>
               )}
-              <button
-                onClick={() => setExpandedPv(isExpanded ? null : candidate.rank)}
-                style={{
-                  ...monoStyle,
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--text-faint)',
-                  cursor: 'pointer',
-                  fontSize: 11,
-                  padding: '0 4px',
-                }}
-                aria-label={isExpanded ? 'Collapse PV' : 'Expand PV'}
-              >
-                {isExpanded ? '▲' : '▼'}
-              </button>
+
+              {/* Eval — hidden in training mode */}
+              {hintMode !== 'training' && (
+                <>
+                  <span style={{ ...monoStyle, color: 'var(--gold)', marginLeft: 'auto' }}>{evalStr}</span>
+                  {deltaStr && (
+                    <span style={{ ...monoStyle, color: '#f87171', fontSize: 11 }}>{deltaStr}</span>
+                  )}
+                </>
+              )}
+
+              {/* PV toggle — hidden in training mode */}
+              {hintMode !== 'training' && (
+                <button
+                  onClick={() => setExpandedPv(isExpanded ? null : candidate.rank)}
+                  style={{
+                    ...monoStyle,
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--text-faint)',
+                    cursor: 'pointer',
+                    fontSize: 11,
+                    padding: '0 4px',
+                    marginLeft: hintMode === 'training' ? 'auto' : undefined,
+                  }}
+                  aria-label={isExpanded ? 'Collapse PV' : 'Expand PV'}
+                >
+                  {isExpanded ? '▲' : '▼'}
+                </button>
+              )}
+
               <button
                 onClick={() => onTryMove(newFen)}
                 style={{
@@ -257,13 +294,14 @@ export default function MoveExplorerPanel({ fen, onTryMove }: MoveExplorerPanelP
                   cursor: 'pointer',
                   fontSize: 11,
                   padding: '2px 8px',
+                  marginLeft: hintMode === 'training' ? 'auto' : undefined,
                 }}
               >
                 Try
               </button>
             </div>
 
-            {isExpanded && candidate.pv.length > 0 && (
+            {isExpanded && candidate.pv.length > 0 && hintMode !== 'training' && (
               <div style={{ ...monoStyle, color: 'var(--text-muted)', fontSize: 11, marginTop: 6, paddingLeft: 20 }}>
                 {candidate.pv.join(' ')}
               </div>

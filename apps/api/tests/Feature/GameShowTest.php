@@ -89,6 +89,9 @@ class GameShowTest extends TestCase
                 'cp_score',
                 'cp_loss',
                 'classification',
+                'themes',
+                'tactical_flags',
+                'risk_note',
             ]],
         ]);
 
@@ -96,6 +99,16 @@ class GameShowTest extends TestCase
         $this->assertCount(2, $moves);
         $this->assertSame(1, $moves[0]['move_number']);
         $this->assertSame(2, $moves[1]['move_number']);
+
+        // Coaching fields should be present (null values are valid for un-analysed moves)
+        foreach ($moves as $move) {
+            $this->assertArrayHasKey('themes', $move);
+            $this->assertArrayHasKey('tactical_flags', $move);
+            $this->assertArrayHasKey('threat_awareness', $move);
+            $this->assertArrayHasKey('risk_note', $move);
+            $this->assertIsArray($move['themes']);
+            $this->assertIsArray($move['tactical_flags']);
+        }
     }
 
     public function test_show_returns_404_for_unknown_uuid(): void

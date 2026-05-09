@@ -5,6 +5,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import MoveNavControls from '@/components/MoveNavControls'
 import MoveDetailPanel from '@/components/MoveDetailPanel'
 import MoveExplorerPanel from '@/components/MoveExplorerPanel'
+import { HintModeProvider, useHintMode, type HintMode } from '@/contexts/HintModeContext'
 
 const ChessBoardViewer = dynamic(() => import('@/components/ChessBoardViewer'), {
   ssr: false,
@@ -15,6 +16,13 @@ const ChessBoardViewer = dynamic(() => import('@/components/ChessBoardViewer'), 
     />
   ),
 })
+
+export interface ThreatAwareness {
+  threats_before: string[]
+  threats_after: string[]
+  response: 'addressed' | 'not_addressed' | 'unknown' | 'none'
+  confidence: 'low' | 'medium' | 'high'
+}
 
 export interface Move {
   id: string
@@ -27,6 +35,10 @@ export interface Move {
   cp_score: number | null
   cp_loss: number | null
   classification: string | null
+  themes: string[]
+  tactical_flags: string[]
+  threat_awareness: ThreatAwareness | null
+  risk_note: string | null
 }
 
 export interface GameAnalysis {
@@ -124,6 +136,41 @@ function StatCard({ label, value, color }: { label: string; value: string | numb
     >
       <span className="text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{label}</span>
       <span className="text-2xl font-semibold" style={{ color: color ?? 'var(--text)' }}>{value}</span>
+    </div>
+  )
+}
+
+const HINT_MODES: { value: HintMode; label: string }[] = [
+  { value: 'training', label: 'Training' },
+  { value: 'guided',   label: 'Guided' },
+  { value: 'full',     label: 'Full Analysis' },
+]
+
+function HintModeToggle() {
+  const { hintMode, setHintMode } = useHintMode()
+  return (
+    <div className="flex items-center gap-2 mb-4">
+      <span className="text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Mode</span>
+      <div
+        className="flex rounded overflow-hidden"
+        style={{ border: '1px solid var(--border)' }}
+      >
+        {HINT_MODES.map(({ value, label }) => (
+          <button
+            key={value}
+            onClick={() => setHintMode(value)}
+            className="px-3 py-1 text-xs transition-colors"
+            style={{
+              background: hintMode === value ? 'rgba(201,168,76,0.20)' : 'var(--surface)',
+              color: hintMode === value ? 'var(--gold)' : 'var(--text-muted)',
+              borderRight: '1px solid var(--border)',
+              cursor: 'pointer',
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
     </div>
   )
 }
@@ -231,7 +278,15 @@ interface Props {
   onPlyChange?: (ply: number) => void
 }
 
-export default function GameAnalysisView({ game, initialPly, onPlyChange }: Props) {
+export default function GameAnalysisView(props: Props) {
+  return (
+    <HintModeProvider>
+      <GameAnalysisViewInner {...props} />
+    </HintModeProvider>
+  )
+}
+
+function GameAnalysisViewInner({ game, initialPly, onPlyChange }: Props) {
   const moves = game.moves
   const resolvedOpeningName = resolveOpeningName(game.opening_name, game.eco_code)
   const hasKnownOpening = Boolean(resolvedOpeningName && resolvedOpeningName.toLowerCase() !== 'unknown')
@@ -538,6 +593,7 @@ export default function GameAnalysisView({ game, initialPly, onPlyChange }: Prop
 
         {/* Right: move list + detail panel */}
         <div className="flex flex-col gap-4">
+          <HintModeToggle />
           <div
             className="rounded overflow-hidden"
             style={{ border: '1px solid rgba(232,224,208,0.10)', maxHeight: 'calc(100vh - 360px)', overflowY: 'auto' }}

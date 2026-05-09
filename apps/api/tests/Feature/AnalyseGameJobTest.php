@@ -63,12 +63,14 @@ class AnalyseGameJobTest extends TestCase
         $stockfish->shouldReceive('analyse')->once()->with('before-fen')->andReturn([
             'best_move' => 'e2e4',
             'cp' => 120,
+            'mate' => null,
             'depth_reached' => 14,
             'best_line' => ['e2e4', 'e7e5'],
         ]);
         $stockfish->shouldReceive('analyse')->once()->with('after-fen')->andReturn([
             'best_move' => 'e7e5',
             'cp' => -40,
+            'mate' => null,
             'depth_reached' => 13,
             'best_line' => ['e7e5', 'g1f3'],
         ]);
@@ -96,6 +98,16 @@ class AnalyseGameJobTest extends TestCase
 
         $analysis = EngineAnalysis::where('move_id', $move->id)->firstOrFail();
         $this->assertNull($analysis->best_move_san);
+
+        // Coaching columns should be populated after job runs
+        $this->assertSame(1, $move->coaching_version);
+        $this->assertIsArray($move->themes);
+        $this->assertIsArray($move->tactical_flags);
+        $this->assertIsArray($move->threat_awareness);
+        $this->assertArrayHasKey('threats_before', $move->threat_awareness);
+        $this->assertArrayHasKey('threats_after', $move->threat_awareness);
+        $this->assertArrayHasKey('response', $move->threat_awareness);
+        $this->assertArrayHasKey('confidence', $move->threat_awareness);
     }
 
     public function test_job_skips_complete_games_unless_forced(): void

@@ -6,7 +6,12 @@ use App\Enums\AnalysisStatus;
 use App\Enums\MoveClassification;
 use App\Models\EngineAnalysis;
 use App\Models\Game;
+use App\Services\BoardAnalysisService;
+use App\Services\CoachingTemplateService;
+use App\Services\FenParserService;
+use App\Services\MoveThemeExtractorService;
 use App\Services\StockfishService;
+use App\Services\ThreatDetectorService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Throwable;
@@ -38,7 +43,13 @@ class AnalyseGameJob implements ShouldQueue
 
         logger()->info("AnalyseGameJob: starting analysis for game {$this->gameId} ({$game->moves->count()} moves)");
 
-        $stockfish  = new StockfishService();
+        $stockfish    = new StockfishService();
+        $fenParser    = new FenParserService();
+        $boardAnalysis = new BoardAnalysisService($fenParser);
+        $themeExtractor = new MoveThemeExtractorService($fenParser, $boardAnalysis);
+        $threatDetector = new ThreatDetectorService($fenParser, $boardAnalysis);
+        $templateService = new CoachingTemplateService();
+
         $cpLosses   = [];
         $counts     = ['blunder' => 0, 'mistake' => 0, 'inaccuracy' => 0];
         $userColour = $game->user_colour?->value;
@@ -74,10 +85,20 @@ class AnalyseGameJob implements ShouldQueue
                 ]
             );
 
+            // Deterministic coaching layer — no additional Stockfish calls
+            $themes    = $themeExtractor->extract($move->fen_before, $move->fen_after, $move->uci, $move->move_number, $move->colour->value);
+            $threatData = $threatDetector->analyse($move->fen_before, $move->fen_after, $move->uci, $before, $after);
+            $riskNote  = $templateService->buildRiskNote($classification, $themes, $threatData['tactical_flags'], $threatData['threat_awareness']);
+
             $move->update([
-                'cp_score'       => $scoreBefore,
-                'cp_loss'        => $cpLoss,
-                'classification' => $classification,
+                'cp_score'         => $scoreBefore,
+                'cp_loss'          => $cpLoss,
+                'classification'   => $classification,
+                'themes'           => $themes,
+                'tactical_flags'   => $threatData['tactical_flags'],
+                'threat_awareness' => $threatData['threat_awareness'],
+                'risk_note'        => $riskNote,
+                'coaching_version' => 1,
             ]);
 
             logger()->debug("AnalyseGameJob: move {$move->move_number} {$move->san} — cp_loss={$cpLoss} class={$classification->value}");

@@ -85,89 +85,95 @@ Outcome: fully working "what-if" explorer powered by Stockfish only.
 
 ---
 
-## Sprint 2 — Deterministic Coaching Layer (No AI)
+## Sprint 2 — Deterministic Coaching Layer (No AI) ✓
 
 Outcome: coaching value appears even with no LLM integration.
 
 ### Backend
 
-- Add classification rules from `delta_from_best` thresholds.
-- Add deterministic teaching metadata:
-  - `themes[]` (development, king safety, center control, material, activity)
-  - `tactical_flags[]` (hanging piece, fork risk, pin/skewer risk, mate threat)
-  - `threat_awareness[]` (detected threats before move, whether player addressed or ignored each threat)
-  - `risk_note` template output
-- Store position coaching summaries for reused positions.
-
-Threat-awareness pass (pre/post move):
-- Before move: detect immediate tactical threats (mate threats, hanging pieces, forks, skewers, discovered attacks, overloaded defenders)
-- After move: classify response (`addressed`, `ignored`, `worsened`)
-- Aggregate consecutive misses to surface patterns like "ignored fork threat for 3 consecutive moves"
+- [x] Add classification rules from `delta_from_best` thresholds.
+- [x] Add deterministic teaching metadata:
+  - [x] `themes[]` (development, king safety, center control, material, activity)
+  - [x] `tactical_flags[]` (soft flags: `forced_mate_present`, `engine_prefers_capture`, `hanging_piece`, `possible_fork`, `possible_pin`)
+  - [x] `threat_awareness` (threats before/after move, response classification, confidence score)
+  - [x] `risk_note` template output
+- [x] `consecutive_miss_count` column — populated by post-loop pass (Sprint 3 aggregation)
+- [x] `game_phase`, `complexity_score` columns added for context
+- [x] `ai_explanation`, `ai_explanation_status`, `ai_explanation_model` columns added as Sprint 5 slots
+- [x] `coaching_version` column for targeted backfills
+- [x] `BackfillCoachingData` artisan command (`coaching:backfill`) — no Stockfish calls
 
 ### Frontend
 
-- Add teaching labels and confidence hints to candidate cards.
-- Add "Why this move" and "Main risk" text from deterministic templates.
-- Add "Threat check" callout:
-  - What the opponent threatened
-  - Whether the chosen move solved it
-- Add hint mode toggle:
-  - Level 1: hide evals, show ranked options
-  - Level 2: show evals and labels
-  - Level 3: show full PV and risk notes
+- [x] Teaching labels and confidence hints on candidate cards (Strong / Solid / Risky)
+- [x] Theme tags and "Threat check" callout in move detail panel
+- [x] `risk_note` template output in full analysis mode
+- [x] Hint mode toggle: Training / Guided / Full Analysis
+  - Training: hide evals, show ranked SAN only
+  - Guided: show evals, labels, themes, threat callout (medium/high confidence)
+  - Full Analysis: everything including risk note
 
 ### Tests
 
-- Unit tests for classification thresholds.
-- Unit tests for deterministic theme extraction logic.
-- Snapshot/contract tests for coaching payload shape.
+- [x] Unit tests for classification thresholds (all boundaries + promotions)
+- [x] Unit tests for deterministic theme extraction (12 cases including en passant, promotion, stalemate)
+- [x] Contract tests for coaching payload shape and allowed flag set
+- [x] Feature test: job writes coaching columns with correct shape
+- [x] Feature test: game API response includes coaching fields on moves
 
 ### Done Definition
 
-- Users get useful move guidance without any generative text.
-- The same position produces consistent labels and coaching flags.
+- [x] Users get useful move guidance without any generative text.
+- [x] The same position produces consistent labels and coaching flags.
 
 ---
 
-## Sprint 3 — AI Narration Enhancement
+## Sprint 3 — AI Narration Layer
 
-Outcome: add plain-English coaching on top of trusted structured data.
+Outcome: AI reads the story the structured data is already telling — narrating patterns, not re-analysing positions.
+
+### Design Principle
+
+The AI is a narrator, not an analyst. It receives the fully-populated coaching columns as a structured object and writes plain-English coaching from that. It never receives raw FEN or engine output alone. The deterministic layer always remains complete and functional without AI.
 
 ### Backend
 
 - Introduce `CoachNarrationService` behind a feature flag.
-- Input contract: engine + deterministic coaching object (never raw board alone).
-- Cache explanations by:
-  - `fen`
-  - `candidate_set_hash`
-  - `rating_band`
-  - `tone`
-  - `prompt_version`
-- Add fallback templates when LLM is disabled or errors.
+- Input contract: serialised coaching columns only (`themes`, `tactical_flags`, `threat_awareness`, `consecutive_miss_count`, `game_phase`, `complexity_score`, `risk_note`, `classification`). Never raw board state alone.
+- Persist output to `moves.ai_explanation` — generated once, re-served from column until `ai_explanation_model` changes or `coaching_version` bumps.
+- Cache key: `fen` + `coaching_version` + `ai_explanation_model` + `prompt_version` — avoids re-generation on unrelated changes.
+- Implement post-loop consecutive miss aggregation in `AnalyseGameJob`: walk move sequence, count runs where `threat_awareness.response = 'not_addressed'`, write `consecutive_miss_count`.
+- Add fallback: if `ai_explanation` is null or `ai_explanation_status = 'failed'`, surface `risk_note` instead. No empty states.
 
 ### Prompt Strategy
 
-- Require engine ranking compliance in prompt.
-- Keep explanation short and concrete.
-- Include one practical "before-you-move" checklist cue.
-- Keep temperature low.
+- Pass structured coaching object as JSON in the prompt — not prose context.
+- Use `consecutive_miss_count` to surface patterns: "you've walked into the same threat three times in this game."
+- Use `game_phase` and `complexity_score` to modulate tone: blunder in a simple endgame ≠ blunder in a complex middlegame.
+- Keep temperature low (≤ 0.3).
+- Keep explanation short and concrete — one coaching insight, not a lecture.
+- Include one practical "before-you-move" cue where relevant.
+- Require engine ranking compliance — AI must not imply a lower-ranked move is better.
 
 ### Frontend
 
-- Show AI explanation per selected candidate move.
-- Add regenerate button (manual only, no auto-retry loops).
-- Show deterministic fallback text instantly; replace with AI text when ready.
+- Render `ai_explanation` in the placeholder slot in `MoveDetailPanel` (`{/* AI coaching explanation will render here — Phase 5 */}`).
+- Show `risk_note` (deterministic fallback) immediately; replace inline when `ai_explanation` loads.
+- Add regenerate button (manual only — no auto-retry loops, no polling).
+- No loading spinners that block the panel — fallback text is always visible.
 
 ### Tests
 
-- Contract tests for narration request/response payload.
-- Integration test for cache reuse and fallback behavior.
-- Guardrail tests ensuring AI output does not reorder engine ranking.
+- Contract tests for narration input/output payload shape.
+- Integration test: same coaching data + same model produces cached result on second request.
+- Integration test: `ai_explanation_status = 'failed'` surfaces `risk_note` fallback.
+- Guardrail test: AI output does not reorder or contradict engine ranking.
 
 ### Done Definition
 
-- AI adds teaching clarity without slowing core move explorer.
-- If AI fails, user still has complete deterministic coaching.
+- AI explanation enhances the deterministic coaching without replacing it.
+- If AI is disabled or fails, users still have complete deterministic coaching — no degraded state.
+- `consecutive_miss_count` patterns are surfaced in AI prose where present.
 
 ---
 

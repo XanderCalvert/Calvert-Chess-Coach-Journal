@@ -27,13 +27,27 @@ class Move extends Model
         'cp_score',
         'cp_loss',
         'classification',
+        'themes',
+        'tactical_flags',
+        'threat_awareness',
+        'risk_note',
+        'consecutive_miss_count',
+        'coaching_version',
+        'game_phase',
+        'complexity_score',
+        'ai_explanation',
+        'ai_explanation_status',
+        'ai_explanation_model',
     ];
 
     protected function casts(): array
     {
         return [
-            'colour'         => PlayerColour::class,
-            'classification' => MoveClassification::class,
+            'colour'           => PlayerColour::class,
+            'classification'   => MoveClassification::class,
+            'themes'           => 'array',
+            'tactical_flags'   => 'array',
+            'threat_awareness' => 'array',
         ];
     }
 
