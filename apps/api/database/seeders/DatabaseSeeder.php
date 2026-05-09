@@ -13,10 +13,20 @@ class DatabaseSeeder extends Seeder
         $this->call(MistakeTagSeeder::class);
 
         if (! App::isProduction()) {
-            User::factory()->create([
-                'display_name' => 'Test User',
-                'email'        => 'test@example.com',
-            ]);
+            $this->call(DevUserSeeder::class);
+
+            User::updateOrCreate(
+                ['email' => 'test@example.com'],
+                [
+                    'display_name' => 'Test User',
+                    'password' => 'password',
+                ]
+            );
+
+            $localOnlySeeder = 'Database\\Seeders\\LocalOnlySeeder';
+            if (class_exists($localOnlySeeder)) {
+                $this->call($localOnlySeeder);
+            }
         }
     }
 }

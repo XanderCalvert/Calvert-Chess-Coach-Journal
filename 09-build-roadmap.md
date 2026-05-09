@@ -11,7 +11,7 @@ Tick `- [ ]` → `- [x]` as you complete items. In GitHub or many editors, check
 Get these working first, in order:
 
 - [x] **1.** Project scaffolding: Next.js app, Laravel API, PostgreSQL schema, Docker Compose
-- [ ] **2.** chess.js integration — confirm PGN parsing works end-to-end
+- [x] **2.** chess.js integration — confirm PGN parsing works end-to-end
 - [ ] **3.** Stockfish integration — spawn process, send a FEN, receive a best move
 - [ ] **4.** Basic auth — register, login, JWT session
 - [ ] **5.** Confirm the full pipeline works manually **before any UI polish**

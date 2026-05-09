@@ -32,5 +32,6 @@ Planned stack:
 
 - Keep changes small, direct, and aligned with the documentation.
 - Add tests around shared logic, parsing, analysis selection, tagging, and API contracts.
+- When adding or changing API tests, also update `apps/api/tests/Tests.md` so the suite reference stays current.
 - Use clear names and simple data flow over broad abstractions.
 - Document setup, run commands, and non-obvious decisions as the codebase grows.

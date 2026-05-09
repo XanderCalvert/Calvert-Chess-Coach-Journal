@@ -22,7 +22,7 @@ Not a Chess.com/Lichess-style platform: no live play, matchmaking, or social lay
 
 ## Repository status
 
-This repository currently holds **planning documentation plus an initial app/infra skeleton**. Laravel and Next.js application code will be scaffolded into `apps/api` and `apps/web` as implementation proceeds; [09-build-roadmap.md](./09-build-roadmap.md) describes the intended build order.
+This repository now includes active implementation in both `apps/api` (Laravel) and `apps/web` (Next.js), alongside the planning docs. Core foundations in place include game import, schema/relationship constraints, and parser/import test coverage; [09-build-roadmap.md](./09-build-roadmap.md) remains the high-level build order.
 
 ## Local structure
 
@@ -42,8 +42,8 @@ The local setup is Herd-first for Laravel and Docker-backed for supporting servi
 
 | Service | Container | Local URL / port |
 |---------|-----------|------------------|
-| Web | `chess-coach-web` | `http://localhost:3000` with local npm, or `http://localhost:3001` with Docker |
-| API | `chess-coach-api` | `http://api.calvertchess.test` or `http://localhost:8081` |
+| Web | `chess-coach-web` | `http://web.calvertchess.test` (preferred), or `http://localhost:3000` with local npm / `http://localhost:3001` with Docker |
+| API | `chess-coach-api` | `http://api.calvertchess.test` |
 | PostgreSQL | `chess-coach-db` | `localhost:5433` |
 | Redis | `chess-coach-redis` | `localhost:6380` |
 
@@ -83,6 +83,7 @@ docker compose --profile docker-api up
 For the API `.test` domain, point this hostname at your local machine through Herd or your hosts file:
 
 ```text
+127.0.0.1 web.calvertchess.test
 127.0.0.1 api.calvertchess.test
 ```
 
@@ -110,7 +111,35 @@ DB_PASSWORD=<your local Postgres password>
 | [07-mistake-taxonomy.md](./07-mistake-taxonomy.md) | Mistake tags and heuristics |
 | [08-ui-structure.md](./08-ui-structure.md) | Screens and flows |
 | [09-build-roadmap.md](./09-build-roadmap.md) | Milestones and build order |
+| [apps/api/tests/Tests.md](./apps/api/tests/Tests.md) | API test suite behavior reference |
 | [AGENTS.md](./AGENTS.md) | Guidance for contributors and AI agents |
+
+## Testing
+
+### API tests (Laravel)
+
+Run all API tests:
+
+```sh
+cd apps/api
+composer test
+```
+
+Alternative direct command:
+
+```sh
+cd apps/api
+php artisan test
+```
+
+### Web tests (Next.js)
+
+Run web test suite:
+
+```sh
+cd apps/web
+npm test
+```
 
 ## Contributing
 

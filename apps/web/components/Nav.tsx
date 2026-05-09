@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { NAV_LINKS } from "@/lib/homepage-data";
 
 export default function Nav() {
@@ -31,13 +32,13 @@ export default function Nav() {
           </li>
         ))}
         <li>
-          <a
-            href="#"
+          <Link
+            href="/import"
             className="text-[13px] font-medium tracking-[0.02em] no-underline px-[18px] py-2 rounded-[4px] transition-colors duration-200"
             style={{ background: "var(--gold)", color: "var(--bg)" }}
           >
             Import a game
-          </a>
+          </Link>
         </li>
       </ul>
     </nav>
