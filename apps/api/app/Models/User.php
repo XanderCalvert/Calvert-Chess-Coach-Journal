@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -48,8 +49,8 @@ class User extends Authenticatable
         return $this->hasMany(StudyRecommendation::class);
     }
 
-    public function latestTrendSummary(): HasMany
+    public function latestTrendSummary(): HasOne
     {
-        return $this->trendSummaries()->latestOfMany('computed_at');
+        return $this->hasOne(TrendSummary::class)->latestOfMany('computed_at');
     }
 }
