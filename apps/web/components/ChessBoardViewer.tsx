@@ -7,12 +7,16 @@ interface ChessBoardViewerProps {
   fen: string
   lastMove: { from: string; to: string } | null
   orientation?: 'white' | 'black'
+  allowDragging?: boolean
+  onPieceDrop?: (sourceSquare: string, targetSquare: string, piece: string) => boolean
 }
 
 export default function ChessBoardViewer({
   fen,
   lastMove,
   orientation = 'white',
+  allowDragging = false,
+  onPieceDrop,
 }: ChessBoardViewerProps) {
   const squareStyles: Record<string, React.CSSProperties> = {}
   if (lastMove) {
@@ -23,10 +27,11 @@ export default function ChessBoardViewer({
   return (
     <Chessboard
       options={{
-        position:        fen,
+        position:         fen,
         boardOrientation: orientation,
         squareStyles,
-        allowDragging:   false,
+        allowDragging,
+        onPieceDrop,
         darkSquareStyle:  { backgroundColor: '#2a231a' },
         lightSquareStyle: { backgroundColor: '#4a3d2a' },
       }}

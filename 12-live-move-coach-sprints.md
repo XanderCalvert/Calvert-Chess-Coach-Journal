@@ -51,30 +51,32 @@ Outcome: fully working "what-if" explorer powered by Stockfish only.
 
 ### Backend
 
-- Add position analysis endpoint by FEN + settings (`depth`, `multipv`, `time_ms`).
-- Return candidate moves with UCI, SAN, eval, mate, and PV.
-- Cache responses by normalized key: `fen + depth + multipv + engine_version`.
-- Add progressive result strategy:
-  - quick response (lower depth/time)
-  - optional deepen/refine job
+- [x] Add position analysis endpoint by FEN + settings (`multipv`, `time_ms`).
+- [x] Return candidate moves with UCI, eval, mate, and PV (SAN resolved client-side via chess.js).
+- [x] Cache responses by normalised key: `sha256(fen) + multipv + time_ms + engine_version` (24 h Laravel file cache).
+- [x] Rate-limit endpoint: 20 req/min per IP.
 
 ### Frontend
 
-- Add a move explorer panel on game analysis page.
-- Render candidate move cards sorted by engine rank.
-- Show eval and delta on each card.
-- Expand card to view PV line.
-- Add "Try your move" interaction:
-  - user picks a move on board
-  - send resulting FEN for analysis
-  - refresh candidate list
+- [x] Add a move explorer panel on game analysis page.
+- [x] Render candidate move cards sorted by engine rank.
+- [x] Show eval (White-positive) and delta on each card.
+- [x] Expand card to view PV line.
+- [x] Add "Try your move" interaction:
+  - user drags a piece on board (explorer mode)
+  - resulting FEN sent for analysis
+  - candidate list refreshes
+- [x] Add compact stats legend/explainer for analysis metrics:
+  - Accuracy (overall and W/B split)
+  - Elo estimate (single-game proxy, not rating-system Elo)
+  - Blunders/Mistakes/Inaccuracies W/B counts
 
 ### Tests
 
-- API feature test for valid candidate response schema.
-- API test for invalid FEN handling.
-- API test that cache hit returns quickly and same payload shape.
-- Web test for panel states: loading, loaded, error, empty.
+- [x] API feature test for valid candidate response schema.
+- [x] API test for invalid FEN handling.
+- [x] API test that cache hit returns quickly and same payload shape.
+- [x] Web tests for panel states: loading, loaded, error, empty (logic + fetch layer; DOM rendering tests require jsdom).
 
 ### Done Definition
 
@@ -306,4 +308,8 @@ Use this section to append ideas as they come up:
 - [ ] Add "best practical move" mode for rapid/blitz contexts
 - [ ] Add "coach voice style" presets
 - [ ] Add "compare my move to top 3" side-by-side line viewer
+- [ ] Add persistent position-analysis cache table (`position_analyses`) for warm-start across server restarts
+- [ ] Add queued preloader job to warm cache for game move positions (`fen_before`) after game analysis finishes
+- [ ] Add progressive depth strategy: quick shallow response first, optional deepen/refine job for key moments
+- [x] Add user-facing stats legend ("How these numbers are calculated")
 

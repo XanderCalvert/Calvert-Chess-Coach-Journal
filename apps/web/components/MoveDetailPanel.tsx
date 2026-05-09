@@ -4,9 +4,11 @@ import { CLASSIFICATION_STYLES, type Move } from '@/components/GameAnalysisView'
 
 interface MoveDetailPanelProps {
   move: Move | null
+  isBookMove?: boolean
+  openingLabel?: string | null
 }
 
-export default function MoveDetailPanel({ move }: MoveDetailPanelProps) {
+export default function MoveDetailPanel({ move, isBookMove = false, openingLabel = null }: MoveDetailPanelProps) {
   const style = {
     background: 'var(--surface)',
     border: '1px solid rgba(232,224,208,0.10)',
@@ -34,6 +36,14 @@ export default function MoveDetailPanel({ move }: MoveDetailPanelProps) {
         <span style={{ fontFamily: 'var(--font-dm-mono)', color: 'var(--text)', fontSize: 18, fontWeight: 600 }}>
           {move.san}
         </span>
+        {isBookMove && (
+          <span
+            className="text-xs px-2 py-0.5 rounded font-medium"
+            style={{ color: '#93c5fd', background: 'rgba(147,197,253,0.15)' }}
+          >
+            Book
+          </span>
+        )}
         {cls && (
           <span
             className="text-xs px-2 py-0.5 rounded font-medium"
@@ -52,6 +62,12 @@ export default function MoveDetailPanel({ move }: MoveDetailPanelProps) {
           <span>Eval: <span style={{ color: 'var(--text)' }}>{move.cp_score > 0 ? '+' : ''}{move.cp_score} cp</span></span>
         )}
       </div>
+
+      {isBookMove && openingLabel && (
+        <p className="text-xs" style={{ color: 'var(--text-faint)' }}>
+          Opening book phase: {openingLabel}
+        </p>
+      )}
 
       {/* AI coaching explanation will render here — Phase 5 */}
     </div>

@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic'
 import { useState, useCallback, useEffect, useRef } from 'react'
 import MoveNavControls from '@/components/MoveNavControls'
 import MoveDetailPanel from '@/components/MoveDetailPanel'
+import MoveExplorerPanel from '@/components/MoveExplorerPanel'
 
 const ChessBoardViewer = dynamic(() => import('@/components/ChessBoardViewer'), {
   ssr: false,
@@ -65,6 +66,55 @@ const RESULT_LABEL: Record<string, string> = {
 }
 
 const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+const ECO_OPENING_FALLBACK: Record<string, string> = {
+  A45: "Queen's Pawn Game",
+  A46: 'Queen\'s Pawn Game: Torre Attack',
+  B00: 'Uncommon Opening',
+  B01: 'Scandinavian Defense',
+  B06: 'Modern Defense',
+  B07: 'Pirc Defense',
+  B12: 'Caro-Kann Defense',
+  B20: 'Sicilian Defense',
+  C00: 'French Defense',
+  C20: "King's Pawn Game",
+  C40: "King's Knight Opening",
+  C50: 'Italian Game',
+  C60: 'Ruy Lopez',
+  D00: "Queen's Pawn Game",
+  D02: "Queen's Pawn Game: London System",
+  D06: "Queen's Gambit",
+  D10: 'Slav Defense',
+  D30: "Queen's Gambit Declined",
+  E00: "Queen's Pawn Game: Catalan",
+  E20: 'Nimzo-Indian Defense',
+}
+
+function resolveOpeningName(openingName: string, ecoCode: string): string {
+  if (openingName && openingName.toLowerCase() !== 'unknown') {
+    return openingName
+  }
+
+  const normalizedEco = ecoCode.trim().toUpperCase()
+  if (!normalizedEco) return openingName || 'Unknown'
+  return ECO_OPENING_FALLBACK[normalizedEco] ?? (openingName || 'Unknown')
+}
+
+function estimatePlayedElo({
+  estimatedAccuracy,
+  blunders,
+  mistakes,
+  inaccuracies,
+}: {
+  estimatedAccuracy: number
+  blunders: number
+  mistakes: number
+  inaccuracies: number
+}): number {
+  // Chessigma-style single-game proxy:
+  // map game accuracy to a low-range "played Elo", then penalize major errors.
+  const raw = (estimatedAccuracy * 7.5) - 40 - (blunders * 70) - (mistakes * 45) - (inaccuracies * 15)
+  return Math.round(Math.max(100, Math.min(2800, raw)))
+}
 
 function StatCard({ label, value, color }: { label: string; value: string | number; color?: string }) {
   return (
@@ -78,13 +128,60 @@ function StatCard({ label, value, color }: { label: string; value: string | numb
   )
 }
 
+function StatsLegend() {
+  return (
+    <details
+      className="rounded p-4 mb-8"
+      style={{ background: 'var(--surface)', border: '1px solid rgba(232,224,208,0.10)' }}
+    >
+      <summary
+        className="cursor-pointer text-sm font-medium"
+        style={{ color: 'var(--text)' }}
+      >
+        Stats legend — how these numbers are calculated
+      </summary>
+      <div className="mt-3 text-sm flex flex-col gap-2" style={{ color: 'var(--text-muted)' }}>
+        <p>
+          <strong style={{ color: 'var(--text)' }}>Accuracy</strong>: overall game accuracy from the analysis pipeline.
+        </p>
+        <p>
+          <strong style={{ color: 'var(--text)' }}>Accuracy (W/B)</strong>: side-level accuracy proxy estimated from average centipawn loss for White and Black.
+        </p>
+        <p>
+          <strong style={{ color: 'var(--text)' }}>Elo (Est, W/B)</strong>: single-game played-strength estimate derived from side accuracy proxy and error counts. It is not an official rating.
+        </p>
+        <p>
+          <strong style={{ color: 'var(--text)' }}>Blunders / Mistakes / Inaccuracies (W/B)</strong>: count of classified errors for White and Black in this game.
+        </p>
+        <p>
+          <strong style={{ color: 'var(--text)' }}>Loss (cp)</strong>: centipawns dropped on the played move versus the engine best move (higher means bigger mistake).
+        </p>
+        <p>
+          <strong style={{ color: 'var(--text)' }}>Eval (cp)</strong>: position evaluation in centipawns after the move; positive favors White, negative favors Black.
+        </p>
+        <p>
+          <strong style={{ color: 'var(--text)' }}>Candidate numbers</strong>: left value is the candidate eval; small red value is how much worse it is than rank 1 (best) in pawns.
+        </p>
+        <p>
+          <strong style={{ color: 'var(--text)' }}>Move labels</strong>: <strong style={{ color: '#4ade80' }}>Best</strong>, <strong style={{ color: '#4ade80' }}>Excellent</strong>, <strong style={{ color: '#86efac' }}>Good</strong>, <strong style={{ color: '#facc15' }}>?!</strong> (inaccuracy), <strong style={{ color: '#fb923c' }}>?</strong> (mistake), <strong style={{ color: '#f87171' }}>??</strong> (blunder).
+        </p>
+        <p>
+          <strong style={{ color: 'var(--text)' }}>Book</strong>: opening-book phase marker from the game opening tag (early opening moves, not an official per-move engine book lookup).
+        </p>
+      </div>
+    </details>
+  )
+}
+
 function MoveCell({
   move,
   isActive,
+  isBookMove,
   onClick,
 }: {
   move: Move | null
   isActive: boolean
+  isBookMove: boolean
   onClick: () => void
 }) {
   if (!move) return <span />
@@ -103,6 +200,14 @@ function MoveCell({
       }}
     >
       <span style={{ color: 'var(--text)' }}>{move.san}</span>
+      {isBookMove && (
+        <span
+          className="text-xs px-1.5 py-0.5 rounded font-medium"
+          style={{ color: '#93c5fd', background: 'rgba(147,197,253,0.15)' }}
+        >
+          Book
+        </span>
+      )}
       {style && (
         <span
           className="text-xs px-1.5 py-0.5 rounded font-medium"
@@ -128,6 +233,51 @@ interface Props {
 
 export default function GameAnalysisView({ game, initialPly, onPlyChange }: Props) {
   const moves = game.moves
+  const resolvedOpeningName = resolveOpeningName(game.opening_name, game.eco_code)
+  const hasKnownOpening = Boolean(resolvedOpeningName && resolvedOpeningName.toLowerCase() !== 'unknown')
+  const openingBookPlyLimit = 10
+  const openingLabel = hasKnownOpening
+    ? `${resolvedOpeningName}${game.eco_code ? ` (${game.eco_code})` : ''}`
+    : null
+  const whiteMoves = moves.filter(move => move.colour === 'white')
+  const blackMoves = moves.filter(move => move.colour === 'black')
+
+  const countByClassification = (sideMoves: Move[], target: string) =>
+    sideMoves.reduce((count, move) => count + (move.classification === target ? 1 : 0), 0)
+
+  const averageCpLoss = (sideMoves: Move[]) => {
+    const losses = sideMoves
+      .map(move => move.cp_loss)
+      .filter((value): value is number => value != null && value >= 0)
+    if (losses.length === 0) return 0
+    return losses.reduce((sum, value) => sum + value, 0) / losses.length
+  }
+
+  const estimateAccuracyFromCpLoss = (avgCpLoss: number) => {
+    // Exponential drop-off gives a stable 0–100 proxy from centipawn loss.
+    const accuracy = 100 * Math.exp(-avgCpLoss / 120)
+    return Math.max(0, Math.min(100, accuracy))
+  }
+
+  const whiteStats = {
+    blunders: countByClassification(whiteMoves, 'blunder'),
+    mistakes: countByClassification(whiteMoves, 'mistake'),
+    inaccuracies: countByClassification(whiteMoves, 'inaccuracy'),
+    avgCpLoss: averageCpLoss(whiteMoves),
+  }
+
+  const blackStats = {
+    blunders: countByClassification(blackMoves, 'blunder'),
+    mistakes: countByClassification(blackMoves, 'mistake'),
+    inaccuracies: countByClassification(blackMoves, 'inaccuracy'),
+    avgCpLoss: averageCpLoss(blackMoves),
+  }
+
+  const whiteAccuracyEstimate = estimateAccuracyFromCpLoss(whiteStats.avgCpLoss)
+  const blackAccuracyEstimate = estimateAccuracyFromCpLoss(blackStats.avgCpLoss)
+
+  const whiteEloEstimate = estimatePlayedElo({ ...whiteStats, estimatedAccuracy: whiteAccuracyEstimate })
+  const blackEloEstimate = estimatePlayedElo({ ...blackStats, estimatedAccuracy: blackAccuracyEstimate })
 
   const clampedInitial =
     initialPly !== undefined
@@ -135,16 +285,27 @@ export default function GameAnalysisView({ game, initialPly, onPlyChange }: Prop
       : -1
 
   const [currentMoveIndex, setCurrentMoveIndex] = useState<number>(clampedInitial)
+  const [explorerFen, setExplorerFen]   = useState<string | null>(null)
   const [copiedShare, setCopiedShare]   = useState(false)
   const [copiedPos, setCopiedPos]       = useState(false)
   const moveListRef    = useRef<HTMLTableSectionElement>(null)
   const onPlyChangeRef = useRef(onPlyChange)
   onPlyChangeRef.current = onPlyChange
 
-  const currentFen =
+  const replayFen =
     currentMoveIndex === -1
       ? START_FEN
       : (moves[currentMoveIndex]?.fen_after ?? START_FEN)
+
+  const explorerBaseFen =
+    currentMoveIndex === -1
+      ? START_FEN
+      : (moves[currentMoveIndex]?.fen_before ?? START_FEN)
+
+  const isExplorerMode = explorerFen !== null
+  const displayedFen   = explorerFen ?? replayFen
+  // Keep currentFen as an alias for the displayed FEN so existing references still work
+  const currentFen = displayedFen
 
   // UCI is 4–5 chars (e.g., "g1f3" or "e7e8q"). We use only the first 4 chars —
   // the promotion piece char (5th) doesn't affect square highlighting.
@@ -156,11 +317,27 @@ export default function GameAnalysisView({ game, initialPly, onPlyChange }: Prop
   const boardOrientation = game.user_colour === 'black' ? 'black' : 'white'
   const isPending = game.analysis_status === 'pending' || game.analysis_status === 'running'
 
-  const goFirst   = useCallback(() => setCurrentMoveIndex(-1), [])
-  const goPrev    = useCallback(() => setCurrentMoveIndex(i => Math.max(-1, i - 1)), [])
-  const goNext    = useCallback(() => setCurrentMoveIndex(i => Math.min(moves.length - 1, i + 1)), [moves.length])
-  const goLast    = useCallback(() => setCurrentMoveIndex(moves.length - 1), [moves.length])
-  const goToMove  = useCallback((index: number) => setCurrentMoveIndex(index), [])
+  const goFirst   = useCallback(() => { setCurrentMoveIndex(-1); setExplorerFen(null) }, [])
+  const goPrev    = useCallback(() => { setCurrentMoveIndex(i => Math.max(-1, i - 1)); setExplorerFen(null) }, [])
+  const goNext    = useCallback(() => { setCurrentMoveIndex(i => Math.min(moves.length - 1, i + 1)); setExplorerFen(null) }, [moves.length])
+  const goLast    = useCallback(() => { setCurrentMoveIndex(moves.length - 1); setExplorerFen(null) }, [moves.length])
+  const goToMove  = useCallback((index: number) => { setCurrentMoveIndex(index); setExplorerFen(null) }, [])
+
+  const handlePieceDrop = useCallback((sourceSquare: string, targetSquare: string, piece: string): boolean => {
+    if (!isExplorerMode && !piece) return false
+    try {
+      const { Chess } = require('chess.js') as typeof import('chess.js')
+      const chess = new Chess(displayedFen)
+      const uci = sourceSquare + targetSquare
+      const move = chess.move({ from: sourceSquare, to: targetSquare, promotion: 'q' })
+      if (!move) return false
+      void uci
+      setExplorerFen(chess.fen())
+      return true
+    } catch {
+      return false
+    }
+  }, [displayedFen, isExplorerMode])
 
   // Notify parent of ply changes for URL sync.
   // Use a ref so this effect only re-runs when the index changes, not when
@@ -234,7 +411,7 @@ export default function GameAnalysisView({ game, initialPly, onPlyChange }: Prop
           {game.white_player} vs {game.black_player}
         </h1>
         <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-          {game.opening_name || '—'}{game.eco_code ? ` · ${game.eco_code}` : ''}{game.played_at ? ` · ${game.played_at}` : ''}
+          {resolvedOpeningName || '—'}{game.eco_code ? ` · ${game.eco_code}` : ''}{game.played_at ? ` · ${game.played_at}` : ''}
           {' · '}{RESULT_LABEL[game.result] ?? game.result}
         </p>
         {game.source_url && (
@@ -247,6 +424,11 @@ export default function GameAnalysisView({ game, initialPly, onPlyChange }: Prop
             >
               View on Chess.com
             </a>
+          </p>
+        )}
+        {openingLabel && (
+          <p className="text-sm mt-2" style={{ color: '#93c5fd' }}>
+            Opening book: {openingLabel}
           </p>
         )}
       </div>
@@ -292,32 +474,66 @@ export default function GameAnalysisView({ game, initialPly, onPlyChange }: Prop
 
       {/* Stats */}
       {game.analysis_status === 'complete' && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
-          <StatCard label="Accuracy"     value={game.accuracy_pct != null ? `${game.accuracy_pct}%` : '—'} color="var(--gold)" />
-          <StatCard label="Blunders"     value={game.blunder_count ?? '—'}    color="#f87171" />
-          <StatCard label="Mistakes"     value={game.mistake_count ?? '—'}    color="#fb923c" />
-          <StatCard label="Inaccuracies" value={game.inaccuracy_count ?? '—'} color="#facc15" />
-        </div>
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
+            <StatCard label="Accuracy"     value={game.accuracy_pct != null ? `${game.accuracy_pct}%` : '—'} color="var(--gold)" />
+            <StatCard label="Accuracy (W/B)" value={`${whiteAccuracyEstimate.toFixed(1)} / ${blackAccuracyEstimate.toFixed(1)}`} color="var(--gold)" />
+            <StatCard label="Elo (Est, W/B)" value={`${whiteEloEstimate} / ${blackEloEstimate}`} color="#e5e7eb" />
+            <StatCard label="Blunders (W/B)" value={`${whiteStats.blunders} / ${blackStats.blunders}`} color="#f87171" />
+            <StatCard label="Mistakes (W/B)" value={`${whiteStats.mistakes} / ${blackStats.mistakes}`} color="#fb923c" />
+            <StatCard label="Inaccuracies (W/B)" value={`${whiteStats.inaccuracies} / ${blackStats.inaccuracies}`} color="#facc15" />
+          </div>
+          <StatsLegend />
+        </>
       )}
 
       {/* Main two-column layout */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
         {/* Left: board + controls */}
         <div className="flex flex-col gap-4">
-          <ChessBoardViewer
-            fen={currentFen}
-            lastMove={lastMove}
-            orientation={boardOrientation}
-          />
-          <MoveNavControls
-            currentIndex={currentMoveIndex}
-            totalMoves={moves.length}
-            onFirst={goFirst}
-            onPrev={goPrev}
-            onNext={goNext}
-            onLast={goLast}
-            disabled={isPending}
-          />
+          <div style={{ position: 'relative' }}>
+            <ChessBoardViewer
+              fen={currentFen}
+              lastMove={isExplorerMode ? null : lastMove}
+              orientation={boardOrientation}
+              allowDragging={true}
+              onPieceDrop={handlePieceDrop}
+            />
+            {isExplorerMode && (
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  border: '3px solid var(--gold)',
+                  borderRadius: 4,
+                  pointerEvents: 'none',
+                }}
+              />
+            )}
+          </div>
+          {isExplorerMode ? (
+            <button
+              onClick={() => setExplorerFen(null)}
+              style={{
+                ...btnBase,
+                background: 'rgba(201,168,76,0.12)',
+                color: 'var(--gold)',
+                border: '1px solid rgba(201,168,76,0.35)',
+              }}
+            >
+              ← Exit explorer
+            </button>
+          ) : (
+            <MoveNavControls
+              currentIndex={currentMoveIndex}
+              totalMoves={moves.length}
+              onFirst={goFirst}
+              onPrev={goPrev}
+              onNext={goNext}
+              onLast={goLast}
+              disabled={isPending}
+            />
+          )}
         </div>
 
         {/* Right: move list + detail panel */}
@@ -352,6 +568,7 @@ export default function GameAnalysisView({ game, initialPly, onPlyChange }: Prop
                         <MoveCell
                           move={white}
                           isActive={currentMoveIndex === whiteIndex}
+                          isBookMove={Boolean(white && hasKnownOpening && white.move_number <= openingBookPlyLimit)}
                           onClick={() => goToMove(whiteIndex)}
                         />
                       </td>
@@ -359,6 +576,7 @@ export default function GameAnalysisView({ game, initialPly, onPlyChange }: Prop
                         <MoveCell
                           move={black}
                           isActive={currentMoveIndex === blackIndex && black != null}
+                          isBookMove={Boolean(black && hasKnownOpening && black.move_number <= openingBookPlyLimit)}
                           onClick={() => { if (black) goToMove(blackIndex) }}
                         />
                       </td>
@@ -369,7 +587,15 @@ export default function GameAnalysisView({ game, initialPly, onPlyChange }: Prop
             )}
           </div>
 
-          <MoveDetailPanel move={currentMove} />
+          <MoveDetailPanel
+            move={currentMove}
+            isBookMove={Boolean(currentMove && hasKnownOpening && currentMove.move_number <= openingBookPlyLimit)}
+            openingLabel={openingLabel}
+          />
+          <MoveExplorerPanel
+            fen={isExplorerMode ? currentFen : explorerBaseFen}
+            onTryMove={(newFen) => setExplorerFen(newFen)}
+          />
         </div>
       </div>
     </>

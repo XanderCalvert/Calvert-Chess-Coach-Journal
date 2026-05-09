@@ -101,6 +101,7 @@ Get these working first, in order:
 - [x] Add the minimum page for reviewing a game: board, move list, move navigation (click, keyboard, buttons).
 - [x] Include loading, failed-analysis, and pending/running states.
 - [x] Public share links (`/g/{share_code}`) and deep-link to specific position (`?ply=N`).
+- [x] Add a stats legend/explainer panel so users can interpret Accuracy, Elo estimate, and W/B error counts.
 - [ ] Key moment cards with played move, best move, and explanation side by side.
 - [ ] Exit criteria: a user can paste a PGN and review the key moments without developer help.
 
@@ -120,6 +121,7 @@ Get these working first, in order:
 ### 11. Polish and deploy
 
 - [ ] Improve responsive layout, error handling, README setup, and deployment configuration.
+- [ ] Improve move explorer latency with persistent position-analysis caching and queued preload of common game FENs.
 - [ ] Deploy a public demo with safe sample data.
 - [ ] Exit criteria: the app is usable from a public URL and documented well enough to run locally.
 
