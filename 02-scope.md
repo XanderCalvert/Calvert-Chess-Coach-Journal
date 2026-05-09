@@ -3,6 +3,34 @@
 ## MVP (6–10 weeks)
 > *The smallest version that makes a game feel analysed, explained, and remembered.*
 
+## Product Direction
+
+### Vision
+
+Build a deterministic chess intelligence platform with AI as an interpretation and coaching layer.
+
+The product must deliver core value without AI:
+- PGN ingestion
+- Engine analysis
+- Tactical classification
+- Trend aggregation
+- Behaviour tracking
+- Visualisation
+
+AI enhances the foundation with:
+- explanations
+- summaries
+- conversational coaching
+- natural language interaction
+
+### Core Insight
+
+Most chess tools stop at accuracy percentages, blunder counts, and eval graphs. This product should identify recurring human decision-making patterns and answer:
+
+> Why do you repeatedly lose in this specific way?
+
+---
+
 ### Features
 1. **PGN Import** — paste a PGN string; app parses moves, headers, metadata; validation with readable errors
 2. **Stockfish Analysis** — server-side evaluation per position; centipawn scores, best move, 3–4 move engine line stored; background job with progress indicator
@@ -53,6 +81,10 @@
 - **Voice commentary** — text-to-speech narration of explanations for on-the-go review
 - **Explain like I'm 800 / 1200 / 1600** — dynamic explanation depth tied to Elo bucket
 - **Personal weakness score** — composite 0–100 score weighted by phase and frequency
+- **Blunder fingerprinting dashboard** — frequency analysis across blunder type, phase, pressure level, and tactical motif
+- **Opening confidence breakdown** — opening exit accuracy and decision collapse point by move range
+- **Position-type performance map** — performance by open/closed/tactical/endgame structures
+- **Attack vs defence personality profile** — identify aggressive/defensive decision tendencies over time
 - **Club review mode** — projector-friendly; hides evaluations; forces guess before reveal
 - **Exportable annotated game reports** — PDF or PGN with all annotations; shareable with a coach
 - **Coach dashboard** — separate view for a coach to review multiple students' games
@@ -67,3 +99,15 @@
 - Opening database lookup (Phase 1 at earliest)
 - Any social or multiplayer feature
 - Rating-adaptive explanations (Phase 1)
+
+---
+
+## Immediate Priority From Current Build State
+
+Given what is already implemented, focus next on:
+
+1. **Plain-English explanations + key-moment cards** in the game analysis experience
+2. **Heuristic mistake tagging** (MVP subset, conservative rules)
+3. **Authentication and user ownership** of games/connected accounts
+4. **Notes + coach agreement** to complete the journal loop
+5. **Dedicated trends/dashboard pages** after explanation/tagging quality is solid

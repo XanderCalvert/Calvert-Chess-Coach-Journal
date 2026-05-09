@@ -130,6 +130,27 @@ class GameShowTest extends TestCase
             ]);
     }
 
+    public function test_show_by_share_code_uses_link_header_not_site_label_for_chess_com_source_url(): void
+    {
+        $pgn = <<<'PGN'
+[Event "Live Chess"]
+[Site "Chess.com"]
+[Link "https://www.chess.com/game/live/168381943790?move=0"]
+1. e4 e5 1-0
+PGN;
+
+        $game = $this->createGame([
+            'imported_from' => 'chesscom',
+            'pgn_raw' => $pgn,
+        ]);
+
+        $this->getJson("/api/v1/games/by-share-code/{$game->share_code}")
+            ->assertStatus(200)
+            ->assertJson([
+                'source_url' => 'https://www.chess.com/game/live/168381943790?move=0',
+            ]);
+    }
+
     public function test_show_by_share_code_returns_404_when_not_found(): void
     {
         $this->getJson('/api/v1/games/by-share-code/zzzzzzzz')

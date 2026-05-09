@@ -6,6 +6,29 @@ Tick `- [ ]` → `- [x]` as you complete items. In GitHub or many editors, check
 
 ---
 
+## Recommended Next Build Sequence (Now)
+
+The highest-value order from current state:
+
+1. **Key moments + plain-English explanations end-to-end**
+   - Persist/select top key moments reliably per analysed game.
+   - Generate cached low-temperature explanations from deterministic board context.
+   - Render key-moment cards in `/g/{share_code}` with jump-to-position support.
+2. **Heuristic mistake tags (MVP subset)**
+   - Start with conservative rules for 3–5 tags.
+   - Store and display tags on key moments; user override can follow.
+3. **Auth + user-owned persistence**
+   - Add login/session and connect imported/manual games to user accounts.
+4. **Journal UX basics**
+   - Manual notes + coach agreement path.
+   - Lightweight summary/recommendation surfaces.
+5. **Then scale breadth**
+   - Dedicated trends/dashboard routes, Lichess import, polish/deploy.
+
+This keeps the core promise strong before expanding scope.
+
+---
+
 ## Before Writing Any Feature Code
 
 Get these working first, in order:
@@ -89,6 +112,8 @@ Get these working first, in order:
 ### 10. Add trends and dashboard
 
 - [ ] Compute mistake frequency, accuracy trend, recent games, and simple study recommendation.
+- [ ] Add opening confidence metrics (book exit, first independent decision, first eval swing).
+- [ ] Add position-type performance slices (open/closed/tactical/endgame and key structures).
 - [ ] Keep charts minimal until the core analysis loop feels strong.
 - [ ] Exit criteria: the dashboard gives a useful next action after several analysed games.
 

@@ -145,8 +145,11 @@ class ConnectedAccountController extends Controller
                 self::GAME_TYPE_RAPID,
                 self::GAME_TYPE_DAILY,
             ])],
+            'days' => ['nullable', 'integer', Rule::in([0, 30, 90, 180, 365])],
         ]);
         $gameType = $validated['game_type'] ?? self::GAME_TYPE_ALL;
+        $days = (int) ($validated['days'] ?? 90);
+        $cutoff = $days > 0 ? Carbon::now()->subDays($days)->startOfDay() : null;
 
         $typeMeta = $this->analysedGameTypeMeta($account->id);
 
@@ -171,6 +174,10 @@ class ConnectedAccountController extends Controller
                 ], $typeMeta));
             }
             $base->whereIn('id', $matchingIds);
+        }
+
+        if ($cutoff !== null) {
+            $base->where('played_at', '>=', $cutoff);
         }
 
         $gamesAnalysed = (clone $base)->count();
@@ -216,6 +223,7 @@ class ConnectedAccountController extends Controller
             ->where('games.connected_account_id', $account->id)
             ->where('games.analysis_status', AnalysisStatus::Complete->value)
             ->when($matchingIds !== null, fn ($query) => $query->whereIn('games.id', $matchingIds))
+            ->when($cutoff !== null, fn ($query) => $query->where('games.played_at', '>=', $cutoff))
             ->whereColumn('moves.colour', 'games.user_colour')
             ->whereNotNull('moves.cp_loss')
             ->avg('moves.cp_loss');
@@ -243,6 +251,7 @@ class ConnectedAccountController extends Controller
             ->where('games.connected_account_id', $account->id)
             ->where('games.analysis_status', AnalysisStatus::Complete->value)
             ->when($matchingIds !== null, fn ($query) => $query->whereIn('games.id', $matchingIds))
+            ->when($cutoff !== null, fn ($query) => $query->where('games.played_at', '>=', $cutoff))
             ->select('games.id', 'games.played_at', DB::raw('AVG(moves.cp_loss) as avg_cp_loss'))
             ->groupBy('games.id', 'games.played_at')
             ->orderBy('games.played_at')

@@ -160,12 +160,22 @@ class GameController extends Controller
             return null;
         }
 
-        if (! preg_match('/\[(Link|Site)\s+"([^"]+)"\]/i', $game->pgn_raw, $matches)) {
-            return null;
+        // Prefer [Link "…"] — Chess.com PGNs also include [Site "Chess.com"], which is not a URL.
+        if (preg_match('/\[Link\s+"([^"]+)"\]/i', $game->pgn_raw, $matches)) {
+            $url = trim($matches[1]);
+            if (str_contains(strtolower($url), 'chess.com')) {
+                return $url;
+            }
         }
 
-        $url = trim($matches[2]);
+        if (preg_match('/\[Site\s+"([^"]+)"\]/i', $game->pgn_raw, $matches)) {
+            $url = trim($matches[1]);
+            $lower = strtolower($url);
+            if (str_starts_with($lower, 'http') && str_contains($lower, 'chess.com')) {
+                return $url;
+            }
+        }
 
-        return str_contains(strtolower($url), 'chess.com') ? $url : null;
+        return null;
     }
 }

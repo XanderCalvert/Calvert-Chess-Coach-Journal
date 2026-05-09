@@ -6,6 +6,11 @@ export async function GET(
 ) {
   const { platform, username } = await params
   const gameType = request.nextUrl.searchParams.get('game_type') ?? 'all'
+  const daysParam = request.nextUrl.searchParams.get('days')
+  const daysQuery =
+    daysParam !== null && daysParam !== ''
+      ? `&days=${encodeURIComponent(daysParam)}`
+      : ''
 
   const laravelUrl = process.env.LARAVEL_API_URL
   if (!laravelUrl) {
@@ -15,7 +20,7 @@ export async function GET(
   let res: Response
   try {
     res = await fetch(
-      `${laravelUrl}/api/v1/connected-accounts/by-username/${platform}/${username}/stats?game_type=${encodeURIComponent(gameType)}`,
+      `${laravelUrl}/api/v1/connected-accounts/by-username/${platform}/${username}/stats?game_type=${encodeURIComponent(gameType)}${daysQuery}`,
       { headers: { Accept: 'application/json' } }
     )
   } catch (err) {

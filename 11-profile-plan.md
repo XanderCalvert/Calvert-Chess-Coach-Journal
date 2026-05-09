@@ -459,6 +459,8 @@ rating_start / rating_end
 
 Move beyond engine classifications and start identifying the type of mistakes a player makes repeatedly.
 
+This phase should evolve toward blunder fingerprinting: not just "you blundered," but the recurring pattern and context behind the blunder.
+
 ### Initial Mistake Categories
 
 ```text
@@ -514,6 +516,22 @@ Across your last 25 rapid games:
 - you often lose advantage after queen trades
 ```
 
+### Blunder Fingerprinting Dimensions (next expansion)
+
+Track recurring mistakes across:
+- blunder type
+- board state / position type
+- tactical motif
+- game phase
+- pressure/time context
+- behavioural pattern (e.g. tunnel vision while attacking)
+
+Example profile insight:
+
+```text
+62% of your blunders happen while attacking, and most come from missed counter-threats.
+```
+
 ### Acceptance Criteria
 
 * Key moments can be tagged with a mistake category
@@ -555,6 +573,22 @@ Inputs:
 Once structured data is reliable, add an LLM layer that explains findings in friendlier language.
 
 > The LLM should explain app-generated findings, not invent chess analysis from scratch.
+
+### Explainability Rule
+
+Prefer rationale-style coaching over engine-only statements.
+
+Instead of:
+
+```text
+Best move was Nf3.
+```
+
+Prefer:
+
+```text
+Nf3 defended the fork square while developing a piece.
+```
 
 ### Acceptance Criteria
 
@@ -611,11 +645,19 @@ This week:
 
 ### Next up
 
-1. Heuristic / LLM key-moment explanations and tags (see [09-build-roadmap.md](./09-build-roadmap.md))
-2. Auth + user-owned games
-3. Dedicated global dashboard / `/patterns` (beyond per-profile aggregates)
-4. Lichess archive sync
-5. Focus areas + coaching summary (Phase 6) once tagging exists
+1. **Close the explain loop on game pages**
+   - Key-moment cards in `/g/{share_code}` with played-vs-best and explanation text.
+   - Cached deterministic LLM explanations per key moment.
+2. **Add first heuristic tags**
+   - Conservative rules for a small tag subset; show tag badges in analysis/profile surfaces.
+3. **Add auth + ownership**
+   - User login/session and profile claim/ownership model for connected accounts and games.
+4. **Promote trends into dedicated views**
+   - Move beyond profile-only aggregates to dashboard/`/patterns` style pages.
+5. **Expand imports**
+   - Lichess sync after Chess.com flow and ownership model are stable.
+6. **Then coaching layers**
+   - Focus areas + coaching summary (Phase 6) once tagging data is reliable.
 
 ---
 

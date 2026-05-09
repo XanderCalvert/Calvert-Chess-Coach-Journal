@@ -72,6 +72,7 @@ Seeds a development user, submits a representative PGN-derived payload, and vali
 | `test_show_returns_404_for_unknown_uuid` | Unknown game ID returns `404`. |
 | `test_show_by_share_code_returns_same_game` | Share-code route resolves to the expected game payload. |
 | `test_show_by_share_code_includes_chess_com_source_url_when_present` | Chess.com-imported games expose a source URL for linking back to the original game page. |
+| `test_show_by_share_code_uses_link_header_not_site_label_for_chess_com_source_url` | Typical PGN has `[Site "Chess.com"]` before `[Link "https://…"]`; extraction must use the Link URL, not the site label. |
 | `test_show_by_share_code_returns_404_when_not_found` | Unknown share code returns `404`. |
 | `test_share_code_lookup_is_case_sensitive` | Share-code lookup behavior is documented as exact-match (case-sensitive). |
 
@@ -102,6 +103,8 @@ Seeds a development user, submits a representative PGN-derived payload, and vali
 | `test_rating_trend_uses_user_rating_after_with_fallback` | Rating trend prefers `user_rating_after` and falls back to `user_rating_before`. |
 | `test_recent_games_derives_result_from_player_perspective` | Recent games list returns player-relative `WIN/LOSS/DRAW` and expected share-code payload. |
 | `test_returns_correct_aggregate_stats` | Blunder/mistake/inaccuracy averages and analysed count are aggregated correctly. |
+| `test_stats_can_be_filtered_by_timeframe_days` | `days` query filter scopes aggregates and trends to games on/after `now - days` (and `days=0` means all time). |
+| `test_stats_rejects_invalid_days_parameter` | Stats endpoint returns `422` when `days` is not one of the allowed values. |
 | `test_stats_can_be_filtered_by_game_type` | `game_type` query filter scopes stats aggregates to bullet/blitz/rapid/daily buckets. |
 | `test_games_endpoint_can_be_filtered_by_game_type` | Connected-account games endpoint respects `game_type` filtering for listed games. |
 | `test_analysed_counts_and_recommended_type_use_time_control_buckets` | `analysed_counts_by_type` buckets complete games by time control; `recommended_game_type` picks the largest bucket. |

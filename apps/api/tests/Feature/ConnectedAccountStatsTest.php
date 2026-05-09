@@ -212,6 +212,46 @@ class ConnectedAccountStatsTest extends TestCase
             ]);
     }
 
+    public function test_stats_can_be_filtered_by_timeframe_days(): void
+    {
+        $account = $this->createAccount();
+        $this->createGame($account, [
+            'result'    => 'white',
+            'user_colour' => 'white',
+            'played_at' => now()->subDays(120),
+        ]);
+        $this->createGame($account, [
+            'result'    => 'black',
+            'user_colour' => 'white',
+            'played_at' => now()->subDays(5),
+        ]);
+
+        $this->getJson('/api/v1/connected-accounts/by-username/chesscom/testplayer/stats?days=90')
+            ->assertOk()
+            ->assertJsonFragment([
+                'games_analysed' => 1,
+                'wins'           => 0,
+                'losses'         => 1,
+            ]);
+
+        $this->getJson('/api/v1/connected-accounts/by-username/chesscom/testplayer/stats?days=0')
+            ->assertOk()
+            ->assertJsonFragment([
+                'games_analysed' => 2,
+                'wins'           => 1,
+                'losses'         => 1,
+            ]);
+    }
+
+    public function test_stats_rejects_invalid_days_parameter(): void
+    {
+        $account = $this->createAccount();
+        $this->createGame($account);
+
+        $this->getJson('/api/v1/connected-accounts/by-username/chesscom/testplayer/stats?days=45')
+            ->assertStatus(422);
+    }
+
     public function test_stats_can_be_filtered_by_game_type(): void
     {
         $account = $this->createAccount();

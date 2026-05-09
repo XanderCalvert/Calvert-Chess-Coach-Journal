@@ -47,6 +47,16 @@ interface GamesMeta {
 
 type GameTypeFilter = 'all' | 'bullet' | 'blitz' | 'rapid' | 'daily'
 
+type TimeframeDays = 0 | 30 | 90 | 180 | 365
+
+const TIMEFRAME_OPTIONS: Array<{ value: TimeframeDays; label: string }> = [
+  { value: 30, label: '30 days' },
+  { value: 90, label: '90 days' },
+  { value: 180, label: '180 days' },
+  { value: 365, label: '365 days' },
+  { value: 0, label: 'All time' },
+]
+
 interface AnalysedCountsByType {
   bullet: number
   blitz: number
@@ -118,8 +128,8 @@ const GAME_TYPE_OPTIONS: Array<{ value: GameTypeFilter; label: string }> = [
 ]
 
 const STAT_HELP: Record<string, string> = {
-  analysed: 'Number of games with completed analysis in the selected game type.',
-  wdl: 'Wins, draws, and losses from your perspective in analysed games.',
+  analysed: 'Number of games with completed analysis in the selected game type and timeframe.',
+  wdl: 'Wins, draws, and losses from your perspective in analysed games (within the timeframe).',
   avgCpl: 'Average centipawn loss on your moves only. Lower is better.',
   blunders: 'Average number of blunders per analysed game.',
   mistakes: 'Average number of mistakes per analysed game.',
@@ -223,6 +233,7 @@ export default function ProfilePage() {
   const [statsLoading, setStatsLoading] = useState(true)
   /** `null` until first bootstrap fetch picks default from API `recommended_game_type`. */
   const [gameTypeFilter, setGameTypeFilter] = useState<GameTypeFilter | null>(null)
+  const [timeframeDays, setTimeframeDays] = useState<TimeframeDays>(90)
   const [analysedCountsByType, setAnalysedCountsByType] = useState<AnalysedCountsByType | null>(null)
 
   // Sync state
@@ -241,6 +252,7 @@ export default function ProfilePage() {
     setNotFound(false)
     setError(null)
     setGameTypeFilter(null)
+    setTimeframeDays(90)
     setAnalysedCountsByType(null)
     setStats(null)
 
@@ -282,7 +294,7 @@ export default function ProfilePage() {
     if (gameTypeFilter === null) return
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setStatsLoading(true)
-    fetch(`/api/connected-accounts/chesscom/${username}/stats?game_type=${gameTypeFilter}`)
+    fetch(`/api/connected-accounts/chesscom/${username}/stats?game_type=${gameTypeFilter}&days=${timeframeDays}`)
       .then(async res => {
         if (!res.ok) return
         const data: ProfileStats = await res.json()
@@ -292,7 +304,7 @@ export default function ProfilePage() {
         }
       })
       .finally(() => setStatsLoading(false))
-  }, [username, gameTypeFilter, notFound])
+  }, [username, gameTypeFilter, timeframeDays, notFound])
 
   // If the selected type has no analysed games (e.g. after sync), fall back.
   useEffect(() => {
@@ -307,7 +319,7 @@ export default function ProfilePage() {
   // Refresh stats after sync completes
   async function refreshStats() {
     if (gameTypeFilter === null) return
-    const res = await fetch(`/api/connected-accounts/chesscom/${username}/stats?game_type=${gameTypeFilter}`)
+    const res = await fetch(`/api/connected-accounts/chesscom/${username}/stats?game_type=${gameTypeFilter}&days=${timeframeDays}`)
     if (res.ok) {
       const data: ProfileStats = await res.json()
       setStats(data)
@@ -561,30 +573,53 @@ export default function ProfilePage() {
             <h2 className="text-base font-semibold" style={{ fontFamily: 'var(--font-playfair)', color: 'var(--text)' }}>
               Analysis trends
             </h2>
-            <label className="flex items-center gap-2 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
-              Game type
-              <select
-                value={gameTypeFilter ?? 'all'}
-                disabled={gameTypeFilter === null}
-                onChange={e => setGameTypeFilter(e.target.value as GameTypeFilter)}
-                className="px-3 py-1.5 rounded text-xs"
-                style={{
-                  background: 'var(--surface)',
-                  color: 'var(--text)',
-                  border: '1px solid rgba(232,224,208,0.18)',
-                  opacity: gameTypeFilter === null ? 0.65 : 1,
-                }}
-              >
-                {gameTypeDropdownOptions.map(option => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                    {analysedCountsByType && option.value !== 'all'
-                      ? ` (${analysedCountsByType[option.value as keyof AnalysedCountsByType]})`
-                      : ''}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="flex flex-wrap items-end gap-4">
+              <label className="flex items-center gap-2 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                Timeframe
+                <select
+                  value={timeframeDays}
+                  disabled={gameTypeFilter === null}
+                  onChange={e => setTimeframeDays(Number(e.target.value) as TimeframeDays)}
+                  className="px-3 py-1.5 rounded text-xs normal-case tracking-normal"
+                  style={{
+                    background: 'var(--surface)',
+                    color: 'var(--text)',
+                    border: '1px solid rgba(232,224,208,0.18)',
+                    opacity: gameTypeFilter === null ? 0.65 : 1,
+                  }}
+                >
+                  {TIMEFRAME_OPTIONS.map(option => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex items-center gap-2 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                Game type
+                <select
+                  value={gameTypeFilter ?? 'all'}
+                  disabled={gameTypeFilter === null}
+                  onChange={e => setGameTypeFilter(e.target.value as GameTypeFilter)}
+                  className="px-3 py-1.5 rounded text-xs normal-case tracking-normal"
+                  style={{
+                    background: 'var(--surface)',
+                    color: 'var(--text)',
+                    border: '1px solid rgba(232,224,208,0.18)',
+                    opacity: gameTypeFilter === null ? 0.65 : 1,
+                  }}
+                >
+                  {gameTypeDropdownOptions.map(option => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                      {analysedCountsByType && option.value !== 'all'
+                        ? ` (${analysedCountsByType[option.value as keyof AnalysedCountsByType]})`
+                        : ''}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
           </div>
 
           {/* Aggregate stat cards */}

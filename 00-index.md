@@ -21,6 +21,7 @@ Full-stack web application for post-game chess analysis, AI explanations, and im
 | [09-build-roadmap.md](./09-build-roadmap.md) | MVP milestones, Phase 1 milestones, recommended build order, practical advice |
 | [10-pages-and-sharing-plan.md](./10-pages-and-sharing-plan.md) | Route-by-route page plan, public sharing URL design, and implementation direction |
 | [11-profile-plan.md](./11-profile-plan.md) | Profiles, Chess.com sync, trends, and follow-on phases |
+| [12-live-move-coach-sprints.md](./12-live-move-coach-sprints.md) | Engine-first sprint plan for live what-if move coaching with AI enhancement path |
 | [ADMIN-GUIDE.md](./ADMIN-GUIDE.md) | Operator commands (bulk sync, analysis, queues) |
 
 ---
@@ -48,6 +49,20 @@ Use [09-build-roadmap.md](./09-build-roadmap.md) for detailed checkboxes. Summar
 - [ ] Dedicated trends `/patterns` or dashboard as in [08-ui-structure.md](./08-ui-structure.md) (profile has **aggregate** trends only)
 - [ ] Club notes / coach agreement in UI
 - [ ] Production deploy + public demo URL as a milestone
+
+---
+
+## What We Should Build Next
+
+Current priority order (short version):
+
+1. **Key moments + LLM explanations in product UI** (`/g/{share_code}`)
+2. **Heuristic mistake tags** (small conservative subset first)
+3. **Auth + user-owned games/profiles**
+4. **Notes + coaching/journal loop**
+5. **Dedicated dashboard/trends pages**, then Lichess and polish
+
+See details in [09-build-roadmap.md](./09-build-roadmap.md) and [11-profile-plan.md](./11-profile-plan.md).
 
 ---
 
