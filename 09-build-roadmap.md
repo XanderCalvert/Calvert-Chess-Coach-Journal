@@ -62,14 +62,14 @@ Use this section as the canonical sequence. It consolidates planning from:
 - [x] Move-detail coaching surfaces in UI (guided/full modes)
 - [x] Backfill command for coaching columns
 - [x] Tests for extraction + payload shape + API exposure
-- [ ] Key-moment-level tagging flow (separate from move-level coaching) completed end-to-end
+- [x] Key-moment-level tagging flow (separate from move-level coaching) completed end-to-end
 
 ### Phase 3 — Key Moments + Explanation Loop (Next Priority)
 
-- [ ] Persist/select top key moments per analysed game reliably
-- [ ] Show key-moment cards in `/g/{share_code}` with played-vs-best context
-- [ ] Render explanation content in key-moment view
-- [ ] Ensure jump-to-position flow is smooth from each key moment
+- [x] Persist/select top key moments per analysed game reliably
+- [x] Show key-moment cards in `/g/{share_code}` with played-vs-best context
+- [x] Render explanation content in key-moment view
+- [x] Ensure jump-to-position flow is smooth from each key moment
 
 ### Phase 4 — AI Narration Layer (After deterministic loop is complete)
 

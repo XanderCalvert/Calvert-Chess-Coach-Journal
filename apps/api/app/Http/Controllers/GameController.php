@@ -8,6 +8,7 @@ use App\Enums\ImportSource;
 use App\Enums\PlayerColour;
 use App\Jobs\AnalyseGameJob;
 use App\Models\Game;
+use App\Models\KeyMoment;
 use App\Models\Move;
 use App\Support\ShareCodeGenerator;
 use Database\Seeders\DevUserSeeder;
@@ -46,14 +47,20 @@ class GameController extends Controller
 
     public function show(string $id): JsonResponse
     {
-        $game = Game::with(['moves' => fn ($q) => $q->orderBy('move_number')])->findOrFail($id);
+        $game = Game::with([
+            'moves'       => fn ($q) => $q->orderBy('move_number'),
+            'keyMoments'  => fn ($q) => $q->orderBy('rank')->with('move.engineAnalysis'),
+        ])->findOrFail($id);
 
         return response()->json($this->formatGameResponse($game));
     }
 
     public function showByShareCode(string $code): JsonResponse
     {
-        $game = Game::with(['moves' => fn ($q) => $q->orderBy('move_number')])
+        $game = Game::with([
+            'moves'      => fn ($q) => $q->orderBy('move_number'),
+            'keyMoments' => fn ($q) => $q->orderBy('rank')->with('move.engineAnalysis'),
+        ])
             ->where('share_code', $code)
             ->firstOrFail();
 
@@ -139,6 +146,22 @@ class GameController extends Controller
             'user_colour'      => $game->user_colour?->value,
             'share_code'       => $game->share_code,
             'source_url'       => $this->extractExternalGameUrl($game),
+            'key_moments'      => $game->relationLoaded('keyMoments')
+                ? $game->keyMoments->map(fn (KeyMoment $km) => [
+                    'rank'             => $km->rank,
+                    'move_id'          => $km->move_id,
+                    'move_number'      => $km->move->move_number,
+                    'colour'           => $km->move->colour->value,
+                    'san'              => $km->move->san,
+                    'cp_loss'          => $km->cp_loss,
+                    'classification'   => $km->move->classification?->value,
+                    'game_phase'       => $km->game_phase->value,
+                    'best_move_uci'    => $km->move->engineAnalysis?->best_move_uci ?? null,
+                    'best_move_san'    => $km->move->engineAnalysis?->best_line[0] ?? null,
+                    'risk_note'        => $km->move->risk_note,
+                    'explanation_text' => $km->explanation_text,
+                ])
+                : [],
             'moves'            => $game->moves->map(fn (Move $m) => [
                 'id'               => $m->id,
                 'move_number'      => $m->move_number,

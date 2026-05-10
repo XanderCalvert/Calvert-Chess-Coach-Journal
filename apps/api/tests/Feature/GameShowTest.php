@@ -2,9 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Enums\ExplanationStatus;
+use App\Enums\GamePhase;
 use App\Models\Game;
+use App\Models\KeyMoment;
 use App\Models\Move;
 use Database\Seeders\DevUserSeeder;
+use Database\Seeders\MistakeTagSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -16,6 +20,7 @@ class GameShowTest extends TestCase
     {
         parent::setUp();
         $this->seed(DevUserSeeder::class);
+        $this->seed(MistakeTagSeeder::class);
     }
 
     private function createGame(array $overrides = []): Game
@@ -176,5 +181,79 @@ PGN;
 
         $this->getJson('/api/v1/games/by-share-code/ABCD2345')
             ->assertStatus(404);
+    }
+
+    public function test_response_includes_empty_key_moments_when_none_exist(): void
+    {
+        $game = $this->createGame(['share_code' => 'km000001']);
+
+        $response = $this->getJson("/api/v1/games/by-share-code/km000001")
+            ->assertStatus(200);
+
+        $this->assertSame([], $response->json('key_moments'));
+    }
+
+    public function test_response_includes_key_moments_with_expected_shape(): void
+    {
+        $game = $this->createGame(['share_code' => 'km000002', 'analysis_status' => 'complete']);
+
+        $move = Move::create([
+            'game_id'     => $game->id,
+            'move_number' => 12,
+            'colour'      => 'white',
+            'san'         => 'Nf6',
+            'uci'         => 'g8f6',
+            'fen_before'  => 'start',
+            'fen_after'   => 'after',
+            'classification' => 'blunder',
+            'cp_loss'     => 320,
+            'risk_note'   => 'A piece is hanging.',
+        ]);
+
+        KeyMoment::create([
+            'game_id'            => $game->id,
+            'move_id'            => $move->id,
+            'rank'               => 1,
+            'cp_loss'            => 320,
+            'game_phase'         => GamePhase::Middlegame,
+            'explanation_status' => ExplanationStatus::NotRequested,
+        ]);
+
+        $response = $this->getJson("/api/v1/games/by-share-code/km000002")
+            ->assertStatus(200);
+
+        $keyMoments = $response->json('key_moments');
+        $this->assertCount(1, $keyMoments);
+
+        $km = $keyMoments[0];
+        $this->assertSame(1,           $km['rank']);
+        $this->assertSame(12,          $km['move_number']);
+        $this->assertSame('white',     $km['colour']);
+        $this->assertSame('Nf6',       $km['san']);
+        $this->assertSame(320,         $km['cp_loss']);
+        $this->assertSame('blunder',   $km['classification']);
+        $this->assertSame('middlegame', $km['game_phase']);
+        $this->assertSame('A piece is hanging.', $km['risk_note']);
+        $this->assertArrayHasKey('best_move_uci',    $km);
+        $this->assertArrayHasKey('best_move_san',    $km);
+        $this->assertArrayHasKey('explanation_text', $km);
+    }
+
+    public function test_key_moments_are_ordered_by_rank(): void
+    {
+        $game = $this->createGame(['share_code' => 'km000003', 'analysis_status' => 'complete']);
+
+        $move1 = Move::create(['game_id' => $game->id, 'move_number' => 5,  'colour' => 'white', 'san' => 'e4', 'uci' => 'e2e4', 'fen_before' => 'a', 'fen_after' => 'b', 'cp_loss' => 400]);
+        $move2 = Move::create(['game_id' => $game->id, 'move_number' => 10, 'colour' => 'black', 'san' => 'd5', 'uci' => 'd7d5', 'fen_before' => 'c', 'fen_after' => 'd', 'cp_loss' => 250]);
+
+        KeyMoment::create(['game_id' => $game->id, 'move_id' => $move2->id, 'rank' => 2, 'cp_loss' => 250, 'game_phase' => GamePhase::Middlegame, 'explanation_status' => ExplanationStatus::NotRequested]);
+        KeyMoment::create(['game_id' => $game->id, 'move_id' => $move1->id, 'rank' => 1, 'cp_loss' => 400, 'game_phase' => GamePhase::Opening,    'explanation_status' => ExplanationStatus::NotRequested]);
+
+        $keyMoments = $this->getJson("/api/v1/games/by-share-code/km000003")
+            ->assertStatus(200)
+            ->json('key_moments');
+
+        $this->assertSame(1, $keyMoments[0]['rank']);
+        $this->assertSame(2, $keyMoments[1]['rank']);
     }
 }

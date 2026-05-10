@@ -3,9 +3,13 @@
 namespace App\Jobs;
 
 use App\Enums\AnalysisStatus;
+use App\Enums\ExplanationStatus;
+use App\Enums\GamePhase;
 use App\Enums\MoveClassification;
 use App\Models\EngineAnalysis;
 use App\Models\Game;
+use App\Models\KeyMoment;
+use App\Models\MistakeTag;
 use App\Services\BoardAnalysisService;
 use App\Services\CoachingTemplateService;
 use App\Services\FenParserService;
@@ -14,6 +18,7 @@ use App\Services\StockfishService;
 use App\Services\ThreatDetectorService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\DB;
 use Throwable;
 
 class AnalyseGameJob implements ShouldQueue
@@ -104,6 +109,8 @@ class AnalyseGameJob implements ShouldQueue
             logger()->debug("AnalyseGameJob: move {$move->move_number} {$move->san} — cp_loss={$cpLoss} class={$classification->value}");
         }
 
+        $this->selectKeyMoments($game);
+
         $accuracy = $this->computeAccuracy($cpLosses);
 
         $game->update([
@@ -122,6 +129,72 @@ class AnalyseGameJob implements ShouldQueue
         logger()->error("AnalyseGameJob: failed for game {$this->gameId} — {$e->getMessage()}");
 
         Game::where('id', $this->gameId)->update(['analysis_status' => AnalysisStatus::Failed]);
+    }
+
+    private function selectKeyMoments(Game $game): void
+    {
+        // Reload moves so we have up-to-date classification and cp_loss.
+        $moves = $game->moves()->orderBy('move_number')->get();
+
+        $qualifying = $moves->filter(fn ($m) => in_array($m->classification, [
+            MoveClassification::Inaccuracy,
+            MoveClassification::Mistake,
+            MoveClassification::Blunder,
+        ], strict: true))->sortByDesc('cp_loss')->values();
+
+        // Cluster adjacent plies: if consecutive candidates share adjacent move_numbers,
+        // keep only the higher-cp_loss one (the first after sorting desc).
+        $clustered = collect();
+        foreach ($qualifying as $move) {
+            $last = $clustered->last();
+            if ($last && abs($move->move_number - $last->move_number) === 1) {
+                // Adjacent — the current move already lost to the higher-cp_loss one above.
+                continue;
+            }
+            $clustered->push($move);
+        }
+
+        $top = $clustered->take(3);
+
+        // Preload mistake tag ids once.
+        $tagIds = MistakeTag::whereIn('slug', ['missed-tactic', 'hanging-piece', 'overlooked-threat', 'positional-mistake'])
+            ->pluck('id', 'slug');
+
+        DB::transaction(function () use ($game, $top, $tagIds) {
+            $game->keyMoments()->delete();
+
+            foreach ($top->values() as $rank0 => $move) {
+                $flags = $move->tactical_flags ?? [];
+                $threatAwareness = $move->threat_awareness ?? [];
+
+                if (in_array('forced_mate_present', $flags)) {
+                    $tagId = $tagIds->get('missed-tactic');
+                } elseif (in_array('hanging_piece', $flags)) {
+                    $tagId = $tagIds->get('hanging-piece');
+                } elseif (($threatAwareness['response'] ?? null) === 'not_addressed') {
+                    $tagId = $tagIds->get('overlooked-threat');
+                } else {
+                    $tagId = $tagIds->get('positional-mistake');
+                }
+
+                $moveNum = $move->move_number;
+                $phase = match (true) {
+                    $moveNum <= 30 => GamePhase::Opening,     // ply 30 ≈ move 15
+                    $moveNum <= 70 => GamePhase::Middlegame,  // ply 70 ≈ move 35
+                    default        => GamePhase::Endgame,
+                };
+
+                KeyMoment::create([
+                    'game_id'            => $game->id,
+                    'move_id'            => $move->id,
+                    'mistake_tag_id'     => $tagId,
+                    'rank'               => $rank0 + 1,
+                    'cp_loss'            => $move->cp_loss,
+                    'game_phase'         => $phase,
+                    'explanation_status' => ExplanationStatus::NotRequested,
+                ]);
+            }
+        });
     }
 
     private function classify(int $cpLoss, string $playedUci, string $bestMove): MoveClassification

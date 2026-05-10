@@ -265,6 +265,7 @@ export default function ProfilePage() {
     if (!username) return
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true)
+    setAccount(null)
     setNotFound(false)
     setError(null)
     setGameTypeFilter(null)
@@ -455,7 +456,82 @@ export default function ProfilePage() {
 
   const isSyncing = account?.sync_status === 'syncing' || syncing
 
-  // Sparkline data arrays
+  if (loading) {
+    return (
+      <>
+        <Nav />
+        <main className="flex-1 px-6 py-12 max-w-5xl mx-auto w-full">
+          <p style={{ color: 'var(--text-muted)' }}>Loading…</p>
+        </main>
+      </>
+    )
+  }
+
+  if (error) {
+    return (
+      <>
+        <Nav />
+        <main className="flex-1 px-6 py-12 max-w-5xl mx-auto w-full">
+          <div className="p-4 rounded text-sm" style={{ background: 'rgba(220,60,60,0.1)', border: '1px solid rgba(220,60,60,0.3)', color: '#f87171' }}>
+            {error}
+          </div>
+        </main>
+      </>
+    )
+  }
+
+  if (notFound) {
+    return (
+      <>
+        <Nav />
+        <main className="flex-1 px-6 py-12 max-w-5xl mx-auto w-full">
+          <div className="max-w-md mx-auto mt-12 p-8 rounded" style={{ background: 'var(--surface)', border: '1px solid rgba(232,224,208,0.10)' }}>
+            <h1 className="text-xl font-semibold mb-2" style={{ fontFamily: 'var(--font-playfair)', color: 'var(--text)' }}>
+              No profile found
+            </h1>
+            <p className="text-sm mb-6" style={{ color: 'var(--text-muted)' }}>
+              Track a Chess.com account to see games and trends.
+            </p>
+            <form onSubmit={handleCreate} className="flex flex-col gap-3">
+              <input
+                type="text"
+                placeholder="Chess.com username"
+                value={formUsername}
+                onChange={e => setFormUsername(e.target.value)}
+                required
+                className="w-full px-4 py-2 rounded text-sm"
+                style={{ background: 'var(--bg)', border: '1px solid rgba(232,224,208,0.20)', color: 'var(--text)', outline: 'none' }}
+              />
+              {formError && (
+                <p className="text-xs" style={{ color: '#f87171' }}>{formError}</p>
+              )}
+              <button
+                type="submit"
+                disabled={formSubmitting || !formUsername.trim()}
+                className="px-5 py-2 rounded text-sm font-medium"
+                style={{ background: 'var(--gold)', color: 'var(--bg)', opacity: formSubmitting ? 0.6 : 1, cursor: formSubmitting ? 'not-allowed' : 'pointer' }}
+              >
+                {formSubmitting ? 'Creating…' : 'Create profile'}
+              </button>
+            </form>
+          </div>
+        </main>
+      </>
+    )
+  }
+
+  if (!account) {
+    return (
+      <>
+        <Nav />
+        <main className="flex-1 px-6 py-12 max-w-5xl mx-auto w-full">
+          <p style={{ color: 'var(--text-muted)' }}>Loading profile…</p>
+        </main>
+      </>
+    )
+  }
+
+  // Sparkline data arrays (account is defined below loading / notFound gates)
   const ratingData = stats?.rating_trend.map(p => p.rating!).filter(v => v != null) ?? []
   const cpLossData  = stats?.cp_loss_trend.map(p => p.avg_cp_loss!) ?? []
   const blunderData = stats?.blunders_trend.map(p => p.blunders!) ?? []
@@ -547,72 +623,6 @@ export default function ProfilePage() {
     if (value === 0) return '#4ade80'
     return '#c9a84c'
   }
-
-  if (loading) {
-    return (
-      <>
-        <Nav />
-        <main className="flex-1 px-6 py-12 max-w-5xl mx-auto w-full">
-          <p style={{ color: 'var(--text-muted)' }}>Loading…</p>
-        </main>
-      </>
-    )
-  }
-
-  if (error) {
-    return (
-      <>
-        <Nav />
-        <main className="flex-1 px-6 py-12 max-w-5xl mx-auto w-full">
-          <div className="p-4 rounded text-sm" style={{ background: 'rgba(220,60,60,0.1)', border: '1px solid rgba(220,60,60,0.3)', color: '#f87171' }}>
-            {error}
-          </div>
-        </main>
-      </>
-    )
-  }
-
-  if (notFound) {
-    return (
-      <>
-        <Nav />
-        <main className="flex-1 px-6 py-12 max-w-5xl mx-auto w-full">
-          <div className="max-w-md mx-auto mt-12 p-8 rounded" style={{ background: 'var(--surface)', border: '1px solid rgba(232,224,208,0.10)' }}>
-            <h1 className="text-xl font-semibold mb-2" style={{ fontFamily: 'var(--font-playfair)', color: 'var(--text)' }}>
-              No profile found
-            </h1>
-            <p className="text-sm mb-6" style={{ color: 'var(--text-muted)' }}>
-              Track a Chess.com account to see games and trends.
-            </p>
-            <form onSubmit={handleCreate} className="flex flex-col gap-3">
-              <input
-                type="text"
-                placeholder="Chess.com username"
-                value={formUsername}
-                onChange={e => setFormUsername(e.target.value)}
-                required
-                className="w-full px-4 py-2 rounded text-sm"
-                style={{ background: 'var(--bg)', border: '1px solid rgba(232,224,208,0.20)', color: 'var(--text)', outline: 'none' }}
-              />
-              {formError && (
-                <p className="text-xs" style={{ color: '#f87171' }}>{formError}</p>
-              )}
-              <button
-                type="submit"
-                disabled={formSubmitting || !formUsername.trim()}
-                className="px-5 py-2 rounded text-sm font-medium"
-                style={{ background: 'var(--gold)', color: 'var(--bg)', opacity: formSubmitting ? 0.6 : 1, cursor: formSubmitting ? 'not-allowed' : 'pointer' }}
-              >
-                {formSubmitting ? 'Creating…' : 'Create profile'}
-              </button>
-            </form>
-          </div>
-        </main>
-      </>
-    )
-  }
-
-  if (!account) return null
 
   return (
     <>

@@ -5,6 +5,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import MoveNavControls from '@/components/MoveNavControls'
 import MoveDetailPanel from '@/components/MoveDetailPanel'
 import MoveExplorerPanel from '@/components/MoveExplorerPanel'
+import KeyMomentsPanel from '@/components/KeyMomentsPanel'
 import { HintModeProvider, useHintMode, type HintMode } from '@/contexts/HintModeContext'
 
 const ChessBoardViewer = dynamic(() => import('@/components/ChessBoardViewer'), {
@@ -41,6 +42,21 @@ export interface Move {
   risk_note: string | null
 }
 
+export interface KeyMoment {
+  rank: number
+  move_id: string
+  move_number: number
+  colour: 'white' | 'black'
+  san: string
+  cp_loss: number
+  classification: string | null
+  game_phase: string
+  best_move_uci: string | null
+  best_move_san: string | null
+  risk_note: string | null
+  explanation_text: string | null
+}
+
 export interface GameAnalysis {
   id: string
   white_player: string
@@ -59,6 +75,7 @@ export interface GameAnalysis {
   share_code: string | null
   source_url?: string | null
   moves: Move[]
+  key_moments?: KeyMoment[]
 }
 
 export const CLASSIFICATION_STYLES: Record<string, { label: string; color: string; bg: string }> = {
@@ -652,6 +669,15 @@ function GameAnalysisViewInner({ game, initialPly, onPlyChange }: Props) {
             fen={isExplorerMode ? currentFen : explorerBaseFen}
             onTryMove={(newFen) => setExplorerFen(newFen)}
           />
+          {game.analysis_status === 'complete' && (game.key_moments?.length ?? 0) > 0 && (
+            <KeyMomentsPanel
+              keyMoments={game.key_moments!}
+              onJumpToMove={(moveId) => {
+                const idx = moves.findIndex(m => m.id === moveId)
+                if (idx >= 0) goToMove(idx)
+              }}
+            />
+          )}
         </div>
       </div>
     </>
