@@ -8,17 +8,20 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Casts\Attribute;
+use App\Models\ConnectedAccount;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
 
 #[Fillable(['email', 'password', 'display_name', 'rating_estimate', 'explanation_depth'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasUuids, HasFactory, Notifiable;
+    use HasUuids, HasFactory, Notifiable, HasApiTokens;
 
     protected function casts(): array
     {
@@ -27,6 +30,16 @@ class User extends Authenticatable
             'password'          => 'hashed',
             'explanation_depth' => ExplanationDepth::class,
         ];
+    }
+
+    public function connectedAccounts(): HasMany
+    {
+        return $this->hasMany(ConnectedAccount::class);
+    }
+
+    protected function hasConnectedAccounts(): Attribute
+    {
+        return Attribute::get(fn () => $this->connectedAccounts()->exists());
     }
 
     public function games(): HasMany

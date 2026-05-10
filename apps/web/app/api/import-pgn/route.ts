@@ -76,11 +76,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'LARAVEL_API_URL is not configured' }, { status: 503 })
   }
 
+  const { getLaravelHeaders, clearAuthCookie } = await import('@/lib/apiClient')
+  const authHeaders = await getLaravelHeaders()
+
   let laravelResponse: Response
   try {
     laravelResponse = await fetch(`${laravelUrl}/api/v1/games`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      headers: authHeaders,
       body: JSON.stringify(tolaravelPayload(pgn, parsed)),
     })
   } catch (err) {
@@ -88,6 +91,11 @@ export async function POST(request: NextRequest) {
       { error: `Could not reach Laravel API: ${err instanceof Error ? err.message : String(err)}` },
       { status: 502 }
     )
+  }
+
+  if (laravelResponse.status === 401) {
+    await clearAuthCookie()
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   if (!laravelResponse.ok) {

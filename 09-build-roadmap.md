@@ -2,7 +2,7 @@
 
 Tick `- [ ]` → `- [x]` as you complete items. In GitHub or many editors, checkboxes are clickable.
 
-> **Repo snapshot (May 2026):** Full **PGN → analyse → review** loop works: import (UI + API), Stockfish via queues, CP loss + classifications, interactive `/g/{share_code}` with `?ply=N`, games list. Deterministic coaching metadata is now generated and rendered at move level (`themes`, tactical flags, threat awareness, risk notes). **Chess.com profiles:** `connected_accounts`, `/u/{username}`, web sync (20-game window), query-time stats + sparklines, game-type filter, `ImportExternalGameJob` dedup. **Operators:** `chess:sync-connected-account` for full-archive pulls ([ADMIN-GUIDE.md](./ADMIN-GUIDE.md)). Still outstanding: auth, key-moment cards with side-by-side explanations, LLM-generated explanations, dedicated dashboard/trends pages, club notes, production deploy.
+> **Repo snapshot (May 2026):** Full **PGN → analyse → review** loop works: import (UI + API), Stockfish via queues, CP loss + classifications, interactive `/g/{share_code}` with `?ply=N`, games list. Deterministic coaching metadata is now generated and rendered at move level (`themes`, tactical flags, threat awareness, risk notes). **Chess.com profiles:** `connected_accounts`, `/u/{username}`, web sync (20-game window), query-time stats + sparklines, game-type filter, `ImportExternalGameJob` dedup. **Operators:** `chess:sync-connected-account` for full-archive pulls ([ADMIN-GUIDE.md](./ADMIN-GUIDE.md)). **Auth + onboarding:** Sanctum registration/login, `chess_token` cookie, onboarding gate (connect account required before dashboard), `/settings` page (add/remove chess accounts), full user-scoped queries, sync ownership enforced. Still outstanding: LLM-generated explanations, dedicated dashboard/trends pages, club notes, production deploy.
 
 ---
 
@@ -81,10 +81,16 @@ Use this section as the canonical sequence. It consolidates planning from:
 
 ### Phase 5 — Ownership/Auth + User Persistence
 
-- [ ] Add auth/session and ownership model
-- [ ] Support profile/account claim and owned-game history
+Connected accounts are the user's **chess identity**, not optional integrations. Onboarding should require linking at least one account before reaching the dashboard.
+
+- [x] Add auth/session and ownership model — Sanctum tokens, `chess_token` httpOnly cookie, login/register/logout/me endpoints
+- [x] Onboarding flow: register → connect Chess.com/Lichess account → auto-import → dashboard (account link is a required step, not a settings item)
+- [x] `/settings` page: profile display + "Your chess accounts" add/remove with last-account → onboarding redirect
+- [x] Move from dev-user assumptions to user-scoped queries — `sync()` ownership-gated, `destroy()` ownership-gated, `has_connected_accounts` on `/auth/me`
+- [x] All coaching language, trends, and insights scoped to the owner's linked identities
+- [x] Ownership verification (bio-code method) explicitly deferred — honour system for MVP *(still deferred)*
+- [ ] Support profile/account claim and owned-game history (games imported before auth linked to a user)
 - [ ] Persist notes and coach agreement under real users
-- [ ] Move from dev-user assumptions to user-scoped queries
 
 ### Phase 6 — Dedicated Trends and Pattern Views
 
@@ -132,7 +138,8 @@ These legacy checkpoints are now represented in the consolidated phase plan abov
 
 - [x] Core technical proof complete: scaffold, PGN parsing, Stockfish integration, full-game evaluation, move classifications.
 - [x] Baseline game analysis UI complete: board, move list/navigation, share links, status states, stats legend.
-- [ ] Still open from legacy plan: auth/ownership, key-moment cards + explanations, dedicated trends/dashboard routes, deployment polish.
+- [x] Auth/ownership complete (Phase 5).
+- [ ] Still open: key-moment cards + LLM explanations, dedicated trends/dashboard routes, deployment polish.
 
 If you need historical wording, reference git history for this file; avoid maintaining duplicate active checklists here.
 
@@ -155,7 +162,7 @@ If you need historical wording, reference git history for this file; avoid maint
 
 **Progress (tick as you go):**
 
-- [x] **M1 — Foundation (partial):** Project scaffold, database schema, PGN parse to Moves table; **auth** still open
+- [x] **M1 — Foundation:** Project scaffold, database schema, PGN parse to Moves table; Sanctum auth (register, login, logout, me, onboarding gate, settings)
 - [x] **M2 — Engine:** Stockfish worker, centipawn evaluation, classification, move-level key moments
 - [x] **M3 — Heuristic Tags (partial):** Rule-based deterministic move themes/tactical tags are live; key-moment-level tagging + manual correction still open
 - [ ] **M4 — Explanations:** LLM API integration, prompt template, explanation stored and displayed

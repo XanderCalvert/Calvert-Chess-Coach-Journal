@@ -7,7 +7,7 @@ use App\Jobs\AnalyseGameJob;
 use App\Models\Game;
 use App\Models\KeyMoment;
 use App\Models\Move;
-use Database\Seeders\DevUserSeeder;
+use App\Models\User;
 use Database\Seeders\MistakeTagSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -16,11 +16,13 @@ class KeyMomentSelectionTest extends TestCase
 {
     use RefreshDatabase;
 
+    private User $user;
+
     protected function setUp(): void
     {
         parent::setUp();
-        $this->seed(DevUserSeeder::class);
         $this->seed(MistakeTagSeeder::class);
+        $this->user = User::factory()->create();
     }
 
     protected function tearDown(): void
@@ -32,7 +34,7 @@ class KeyMomentSelectionTest extends TestCase
     private function createGame(): Game
     {
         return Game::create([
-            'user_id'         => DevUserSeeder::UUID,
+            'user_id'         => $this->user->id,
             'pgn_raw'         => '',
             'white_player'    => 'A',
             'black_player'    => 'B',

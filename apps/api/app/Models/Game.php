@@ -7,6 +7,7 @@ use App\Enums\GameResult;
 use App\Enums\ImportSource;
 use App\Enums\Platform;
 use App\Enums\PlayerColour;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -59,6 +60,11 @@ class Game extends Model
             'platform'        => Platform::class,
             'rated'           => 'boolean',
         ];
+    }
+
+    public function scopeForUser(Builder $query, string $userId): Builder
+    {
+        return $query->where('user_id', $userId);
     }
 
     public function user(): BelongsTo

@@ -28,6 +28,7 @@ class ConnectedAccountController extends Controller
     public function index(): JsonResponse
     {
         $accounts = ConnectedAccount::query()
+            ->where('user_id', auth()->id())
             ->orderBy('platform')
             ->orderBy('username')
             ->paginate(20);
@@ -54,13 +55,14 @@ class ConnectedAccountController extends Controller
         $normalised = strtolower($data['username']);
 
         $account = ConnectedAccount::updateOrCreate(
-            ['platform' => $data['platform'], 'normalised_username' => $normalised],
+            ['user_id' => auth()->id(), 'platform' => $data['platform'], 'normalised_username' => $normalised],
             ['username' => $data['username']],
         );
 
         return response()->json($this->formatAccount($account), $account->wasRecentlyCreated ? 201 : 200);
     }
 
+    // Intentionally unauthenticated — powers the public /u/[username] profile page.
     public function showByUsername(string $platform, string $username): JsonResponse
     {
         $account = ConnectedAccount::where('platform', $platform)
@@ -70,6 +72,7 @@ class ConnectedAccountController extends Controller
         return response()->json($this->formatAccount($account));
     }
 
+    // Intentionally unauthenticated — powers the public /u/[username] profile page.
     public function gamesByUsername(Request $request, string $platform, string $username): JsonResponse
     {
         $account = ConnectedAccount::where('platform', $platform)
@@ -131,6 +134,7 @@ class ConnectedAccountController extends Controller
         ]);
     }
 
+    // Intentionally unauthenticated — powers the public /u/[username] profile page.
     public function statsByUsername(Request $request, string $platform, string $username): JsonResponse
     {
         $account = ConnectedAccount::where('platform', $platform)
@@ -404,6 +408,7 @@ class ConnectedAccountController extends Controller
     {
         $account = ConnectedAccount::where('platform', $platform)
             ->where('normalised_username', strtolower($username))
+            ->where('user_id', auth()->id())
             ->firstOrFail();
 
         if ($account->sync_status === SyncStatus::Syncing) {
@@ -414,6 +419,17 @@ class ConnectedAccountController extends Controller
         $account->update(['sync_status' => SyncStatus::Syncing->value]);
 
         return response()->json($this->formatAccount($account->fresh()), 202);
+    }
+
+    public function destroy(string $id): JsonResponse
+    {
+        $account = ConnectedAccount::where('id', $id)
+            ->where('user_id', auth()->id())
+            ->firstOrFail();
+
+        $account->delete();
+
+        return response()->json(null, 204);
     }
 
     /**

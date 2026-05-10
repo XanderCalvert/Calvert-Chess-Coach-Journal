@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import { cookies } from "next/headers";
+import { AuthProvider, AuthUser } from "@/lib/auth-context";
 import "./globals.css";
 
 const playfair = localFont({
@@ -36,18 +38,41 @@ export const metadata: Metadata = {
   description: "Post-game chess analysis, explanations, and improvement tracking.",
 };
 
-export default function RootLayout({
+async function getInitialUser(): Promise<AuthUser | null> {
+  const cookieStore = await cookies()
+  const token = cookieStore.get('chess_token')?.value
+  if (!token) return null
+
+  const laravelUrl = process.env.LARAVEL_API_URL
+  if (!laravelUrl) return null
+
+  try {
+    const res = await fetch(`${laravelUrl}/api/v1/auth/me`, {
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+    })
+    if (!res.ok) return null
+    return res.json()
+  } catch {
+    return null
+  }
+}
+
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const user = await getInitialUser()
+
   return (
     <html
       lang="en"
       className={`${playfair.variable} ${dmSans.variable} ${dmMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <AuthProvider initialUser={user}>{children}</AuthProvider>
+      </body>
     </html>
   );
 }

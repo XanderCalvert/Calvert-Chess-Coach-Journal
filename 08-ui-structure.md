@@ -6,15 +6,18 @@ Rough mapping to this doc:
 
 | Doc screen | In app today |
 |------------|----------------|
-| Game Import | `/import` — PGN paste, submit |
-| Game List | `/games` — list with status |
+| Registration | `/register` — name, email, password; redirects to `/onboarding` on first register |
+| Login | `/login` — email/password; redirects to `/onboarding` if no accounts linked, else `/games` |
+| Onboarding | `/onboarding` — required step: connect Chess.com or Lichess account before dashboard |
+| Game Import | `/import` — PGN paste, submit; gated: requires auth + at least one connected account |
+| Game List | `/games` — list with status; gated: requires auth + at least one connected account |
 | Game Detail / Replay | `/g/{share_code}` (primary); `/games/{id}/analysis` still available |
+| Settings | `/settings` — profile (name, email) + "Your chess accounts" (add/remove linked accounts) |
 | Dashboard | Not a dedicated page yet |
 | Trends | Not `/patterns`; **profile** `/u/{username}` shows aggregate trends for a linked Chess.com account |
-| Profile (settings) | Not `/profile`; external identity is **Chess.com username** on `/u/{username}` |
 | Key moment cards / explanations | Board + move detail; LLM explanation cards not wired |
 
-Layout: **Nav** component drives top/side navigation (not necessarily a 220px left sidebar as specified below).
+Layout: **Nav** component drives top/side navigation (not necessarily a 220px left sidebar as specified below). Settings link is in Nav.
 
 ---
 
@@ -124,6 +127,7 @@ Components:
 
 Components:
 - User profile: name, email, approximate rating (optional)
+- **Chess accounts:** list of linked Chess.com / Lichess identities with add/remove controls — framed as "Your chess accounts", not "Integrations"
 - Explanation depth preference: Beginner / Club player / Experienced
 - Stockfish depth setting
 - API key management (if using self-hosted LLM or third-party)
@@ -135,10 +139,10 @@ Components:
 
 ### First-Time User
 1. Arrive at home page — clear headline explaining the product
-2. Register with email and password (or guest for MVP)
-3. Onboarding tooltips: Import → Analyse → Review
-4. Prompted to paste first PGN
-5. After first game analysed → redirected to game detail page
+2. Register with email and password
+3. **Connect chess account** — onboarding step, not optional settings: "Connect your Chess.com or Lichess account to start analysing your games." User enters their username; app imports recent games automatically.
+4. After first sync → redirected to dashboard/games list
+5. Prompted to open first analysed game
 
 ### Paste PGN and Analyse
 1. Navigate to Import page

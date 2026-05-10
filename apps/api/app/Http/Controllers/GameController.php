@@ -11,7 +11,6 @@ use App\Models\Game;
 use App\Models\KeyMoment;
 use App\Models\Move;
 use App\Support\ShareCodeGenerator;
-use Database\Seeders\DevUserSeeder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -21,7 +20,7 @@ class GameController extends Controller
 {
     public function index(): JsonResponse
     {
-        $games = Game::where('user_id', DevUserSeeder::UUID)
+        $games = Game::forUser(auth()->id())
             ->orderByDesc('played_at')
             ->orderByDesc('created_at')
             ->get()
@@ -50,7 +49,7 @@ class GameController extends Controller
         $game = Game::with([
             'moves'       => fn ($q) => $q->orderBy('move_number'),
             'keyMoments'  => fn ($q) => $q->orderBy('rank')->with('move.engineAnalysis'),
-        ])->findOrFail($id);
+        ])->forUser(auth()->id())->findOrFail($id);
 
         return response()->json($this->formatGameResponse($game));
     }
@@ -89,7 +88,7 @@ class GameController extends Controller
 
         $game = DB::transaction(function () use ($data): Game {
             $game = Game::create([
-                'user_id'         => DevUserSeeder::UUID,
+                'user_id'         => auth()->id(),
                 'pgn_raw'         => $data['pgn_raw'],
                 'white_player'    => $data['white_player'],
                 'black_player'    => $data['black_player'],

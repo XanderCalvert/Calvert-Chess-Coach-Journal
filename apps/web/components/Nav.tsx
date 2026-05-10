@@ -41,6 +41,14 @@ export default function Nav() {
         </li>
         <li>
           <Link
+            href="/settings"
+            className="nav-link text-[13px] tracking-[0.03em] no-underline"
+          >
+            Settings
+          </Link>
+        </li>
+        <li>
+          <Link
             href="/import"
             className="text-[13px] font-medium tracking-[0.02em] no-underline px-[18px] py-2 rounded-[4px] transition-colors duration-200"
             style={{ background: "var(--gold)", color: "var(--bg)" }}

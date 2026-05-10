@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Jobs\AnalyseGameJob;
 use App\Models\Game;
-use Database\Seeders\DevUserSeeder;
+use App\Models\User;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use App\Models\Move;
@@ -22,7 +22,7 @@ class GameImportTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->seed(DevUserSeeder::class);
+        $this->actingAs(User::factory()->create(), 'sanctum');
         Bus::fake();
     }
 

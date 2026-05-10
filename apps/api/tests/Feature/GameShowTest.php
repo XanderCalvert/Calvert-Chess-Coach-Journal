@@ -7,6 +7,7 @@ use App\Enums\GamePhase;
 use App\Models\Game;
 use App\Models\KeyMoment;
 use App\Models\Move;
+use App\Models\User;
 use Database\Seeders\DevUserSeeder;
 use Database\Seeders\MistakeTagSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -16,17 +17,21 @@ class GameShowTest extends TestCase
 {
     use RefreshDatabase;
 
+    private User $user;
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->seed(DevUserSeeder::class);
         $this->seed(MistakeTagSeeder::class);
+        $this->user = User::factory()->create();
+        $this->actingAs($this->user, 'sanctum');
     }
 
     private function createGame(array $overrides = []): Game
     {
         return Game::create(array_merge([
-            'user_id'         => DevUserSeeder::UUID,
+            'user_id'         => $this->user->id,
             'pgn_raw'         => '[White "A"][Black "B"][Result "1-0"] 1.e4 e5 1-0',
             'white_player'    => 'White Player',
             'black_player'    => 'Black Player',
@@ -122,6 +127,28 @@ class GameShowTest extends TestCase
             ->assertStatus(404);
     }
 
+    public function test_show_returns_404_for_another_users_game(): void
+    {
+        $otherUser = User::factory()->create();
+        $game = Game::create([
+            'user_id'         => $otherUser->id,
+            'pgn_raw'         => '[White "A"][Black "B"][Result "1-0"] 1.e4 e5 1-0',
+            'white_player'    => 'Other',
+            'black_player'    => 'Player',
+            'result'          => 'white',
+            'user_colour'     => 'white',
+            'played_at'       => now(),
+            'eco_code'        => 'C20',
+            'opening_name'    => 'King Pawn Game',
+            'move_count'      => 2,
+            'analysis_status' => 'pending',
+            'imported_from'   => 'paste',
+            'share_code'      => 'other001',
+        ]);
+
+        $this->getJson("/api/v1/games/{$game->id}")->assertStatus(404);
+    }
+
     public function test_show_by_share_code_returns_same_game(): void
     {
         $game = $this->createGame(['share_code' => 'm8n7p6q5']);
@@ -187,7 +214,7 @@ PGN;
     {
         $game = $this->createGame(['share_code' => 'km000001']);
 
-        $response = $this->getJson("/api/v1/games/by-share-code/km000001")
+        $response = $this->getJson("/api/v1/games/by-share-code/{$game->share_code}")
             ->assertStatus(200);
 
         $this->assertSame([], $response->json('key_moments'));

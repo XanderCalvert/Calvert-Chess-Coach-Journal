@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Enums\AnalysisStatus;
 use App\Models\Game;
+use App\Models\User;
 use Database\Seeders\DevUserSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -12,16 +13,20 @@ class GameListTest extends TestCase
 {
     use RefreshDatabase;
 
+    private User $user;
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->seed(DevUserSeeder::class);
+        $this->user = User::factory()->create();
+        $this->actingAs($this->user, 'sanctum');
     }
 
     private function createGame(array $overrides = []): Game
     {
         return Game::create(array_merge([
-            'user_id'         => DevUserSeeder::UUID,
+            'user_id'         => $this->user->id,
             'pgn_raw'         => '[White "A"][Black "B"][Result "1-0"] 1.e4 1-0',
             'white_player'    => 'White Player',
             'black_player'    => 'Black Player',
@@ -43,7 +48,7 @@ class GameListTest extends TestCase
              ->assertExactJson([]);
     }
 
-    public function test_returns_all_games_for_dev_user(): void
+    public function test_returns_all_games_for_authenticated_user(): void
     {
         $this->createGame(['white_player' => 'Morphy']);
         $this->createGame(['white_player' => 'Kasparov']);
@@ -100,5 +105,31 @@ class GameListTest extends TestCase
         $game = $this->getJson('/api/v1/games')->json('0');
 
         $this->assertArrayNotHasKey('moves', $game);
+    }
+
+    public function test_does_not_return_other_users_games(): void
+    {
+        $otherUser = User::factory()->create();
+        Game::create([
+            'user_id'         => $otherUser->id,
+            'pgn_raw'         => '[White "A"][Black "B"][Result "1-0"] 1.e4 1-0',
+            'white_player'    => 'OtherUser',
+            'black_player'    => 'Opponent',
+            'result'          => 'white',
+            'user_colour'     => 'white',
+            'played_at'       => now(),
+            'eco_code'        => 'B00',
+            'opening_name'    => 'Test Opening',
+            'move_count'      => 1,
+            'analysis_status' => AnalysisStatus::Pending,
+            'imported_from'   => 'paste',
+        ]);
+
+        $this->createGame(['white_player' => 'MyGame']);
+
+        $games = $this->getJson('/api/v1/games')->assertStatus(200)->json();
+
+        $this->assertCount(1, $games);
+        $this->assertSame('MyGame', $games[0]['white_player']);
     }
 }

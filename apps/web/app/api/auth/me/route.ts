@@ -6,11 +6,11 @@ export async function GET() {
 
   let res: Response
   try {
-    res = await fetch(`${getLaravelBaseUrl()}/api/v1/games`, { headers })
+    res = await fetch(`${getLaravelBaseUrl()}/api/v1/auth/me`, { headers })
   } catch (err) {
     return NextResponse.json(
-      { error: `Could not reach Laravel API: ${err instanceof Error ? err.message : String(err)}` },
-      { status: 502 }
+      { error: `Could not reach API: ${err instanceof Error ? err.message : String(err)}` },
+      { status: 502 },
     )
   }
 
@@ -19,6 +19,6 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const data = await res.json()
-  return NextResponse.json(data, { status: res.status })
+  const user = await res.json()
+  return NextResponse.json(user, { status: res.status })
 }
