@@ -1,26 +1,74 @@
 # Chess Coach Journal — Analysis Pipeline
 
-Analysis is an asynchronous pipeline triggered when a user submits a game for import. It runs as a series of background jobs to avoid blocking the HTTP request.
+The pipeline is **staged**, not single-shot. It is split into three independent stages so the expensive engine work only runs when it is actually needed:
 
-**Status (May 2026):** PGN parse → persist moves → `AnalyseGameJob` (Stockfish, CP loss, classifications, game counters, `analysis_status`) is **live**. Key-moment persistence, tagging, LLM explanations, and post-game summary jobs described below are **not fully wired** to match this doc end-to-end; see [09-build-roadmap.md](./09-build-roadmap.md).
+```text
+Sync metadata         (cheap, default for every imported game)
+    ↓
+Analyse selectively   (auto for a small recent subset; on demand otherwise)
+    ↓
+Generate coaching    (key moments, explanations, summary, trends — derived from analysed games)
+```
+
+The legacy "import → immediately analyse every game with Stockfish" flow is deprecated. Analysing hundreds of historical games most users will never review wastes compute and slows the games list. Instead, sync should always feel instant, and analysis should feel like an intentional coaching action.
+
+**Status (May 2026):** PGN parse → persist moves → `AnalyseGameJob` (Stockfish, CP loss, classifications, game counters, `analysis_status`) is **live** but currently triggered for every imported/synced game. Migrating to the staged model below is a current priority. Key-moment persistence, tagging, LLM explanations, and post-game summary jobs described below are **not fully wired** to match this doc end-to-end; see [09-build-roadmap.md](./09-build-roadmap.md).
 
 ---
 
-## Step 1: PGN Parsing
+## Stage A — Sync / Import (metadata only)
 
-- Receive raw PGN string from the API endpoint
-- Parse using chess.js (Node) or a PHP chess library on the backend
-- Extract headers: White, Black, Date, Result, ECO, Event
-- Validate that the move sequence is legal
-- Create the `Games` record with status `pending`
-- Create one `Moves` record per half-move, storing FEN before and SAN
-- Enqueue the Stockfish analysis job
+The cheap layer. Every imported game flows through here regardless of whether it will ever be analysed.
+
+### A.1 Connected-account sync (primary path)
+
+- Triggered by `POST /api/v1/connected-accounts/{id}/sync` or scheduled refresh
+- `SyncChessComAccountJob` pulls archives + ratings
+- For each new game (deduped by `connected_account_id` + Chess.com game UUID), enqueue `ImportExternalGameJob`
+- `ImportExternalGameJob` persists:
+  - PGN raw + parsed moves
+  - result, opening (ECO + name), date, time control
+  - rated flag, user rating before/after, opponent username + rating
+  - `analysis_status = pending`
+- `SyncChessComAccountJob` then selects the **recent auto-analyse subset** (MVP: the **5 most-recent newly-imported games** for that sync run) and dispatches `AnalyseGameJob` for those only.
+- All other newly imported games stay `pending` until the user explicitly analyses them.
+
+### A.2 Manual PGN import (secondary path)
+
+- `POST /api/v1/games` with a pasted PGN
+- Used for OTB / club / training positions / unsupported sources
+- Imported game is created with `analysis_status = pending` and **no analysis is auto-queued**; the user clicks "Analyse this game" on the resulting game page (or the games list)
+- Optional UX: keep an "Analyse on submit" toggle on the import form for users who want the legacy behaviour for a one-off paste
+
+After Stage A, the user can browse and replay every synced game immediately — the engine has done no work yet for the bulk of the archive.
+
+---
+
+## Stage B — Selective Stockfish Analysis (engine, on demand)
+
+The expensive layer. Triggered either by the recent-subset rule in Stage A or by an explicit user action.
+
+### B.1 Trigger
+
+- `POST /api/v1/games/{id}/analyse`
+  - Validates ownership
+  - Sets `analysis_status = queued`, `analysis_requested_at = now()`
+  - Dispatches `AnalyseGameJob`
+- Auto-trigger from `SyncChessComAccountJob` for the recent subset (same code path)
+
+### B.2 Stockfish run
+
+The engine work below is unchanged from the previous design — what's new is **when** it runs.
+
+## Step 1: PGN Parsing (already done in Stage A)
+
+For manual PGN imports the parse happens at import time. For synced games it happens inside `ImportExternalGameJob`. Either way, by the time `AnalyseGameJob` runs the `Games` row + `Moves` rows already exist.
 
 ---
 
 ## Step 2: Stockfish Evaluation
 
-- Worker picks up the job, receiving the `game_id`
+- Worker picks up the job, sets `analysis_status = analysing`
 - For each move in order, construct the FEN position and pass it to Stockfish
 - Stockfish runs server-side as a child process (`child_process.spawn` or `proc_open`)
 - Each position analysed to a fixed depth (default: **18** for MVP, configurable)
@@ -32,9 +80,16 @@ Analysis is an asynchronous pipeline triggered when a user submits a game for im
   - **Inaccuracy** — > 20 cp
   - **Good / Best** — otherwise
 - Accuracy formula: `accuracy = 103.1668 × exp(−0.04354 × avg_cp_loss) − 3.1669`
-- On completion, set game status to `engine_complete` and enqueue explanation job
+- On completion, set `analysis_status = analysed` and enqueue the coaching jobs (Stage C)
+- On failure, set `analysis_status = failed` so the UI can surface a retry control
 
 ---
+
+---
+
+## Stage C — Coaching Generation (derived from analysed games)
+
+Steps 3–7 below run only after Stage B for a given game. The richness of the coaching layer grows naturally as more games are analysed — this is the basis for progressive unlocks ("Analyse 5 games to unlock your coaching report"; "Analyse 20 to unlock recurring mistake trends").
 
 ## Step 3: Key Moment Selection
 
@@ -94,8 +149,21 @@ Rule-based detection for MVP tags only. All others assigned by LLM or manually b
 
 | Job | Trigger | Description |
 |-----|---------|-------------|
-| `AnalyseGameJob` | On import | Runs Stockfish, selects key moments, tags mistakes |
-| `GenerateExplanationsJob` | After AnalyseGameJob | Calls LLM for each key moment |
+| `SyncChessComAccountJob` | User clicks Sync, scheduled refresh, or CLI | Fetches archives + ratings; enqueues `ImportExternalGameJob` per new game; selects the recent auto-analyse subset (MVP: 5 most-recent newly imported) and dispatches `AnalyseGameJob` for those only |
+| `ImportExternalGameJob` | From sync | Persists PGN + moves + metadata; sets `analysis_status = pending`; **does not** auto-queue analysis |
+| `AnalyseGameJob` | Recent-subset rule, or `POST /games/{id}/analyse` | Sets `analysis_status = analysing`; runs Stockfish; sets `analysis_status = analysed`; enqueues `GenerateExplanationsJob` |
+| `GenerateExplanationsJob` | After `AnalyseGameJob` | Calls LLM for each key moment |
 | `GenerateSummaryJob` | After all explanations complete | Writes game summary |
-| `UpdateTrendsJob` | After summary | Recomputes TrendSummary |
+| `UpdateTrendsJob` | After summary | Recomputes TrendSummary; coaching depth scales with the number of analysed games |
 | `RetryExplanationJob` | On LLM failure | Retries up to 3 times with backoff |
+
+---
+
+## Recommended MVP analysis strategy
+
+- **Auto-analyse a small recent subset after sync.** MVP target: the **5 most-recent newly-imported games** per sync run. This number should be configurable per user/tier later.
+- **Everything else stays `pending` until explicitly analysed.** Surfaced as an "Analyse this game" CTA on both the games list (for `pending` rows) and the game detail page.
+- **Game pages must be useful before analysis.** Board replay, opening/result metadata, and the analysis CTA are visible for `pending` games; coaching/evaluation panels are locked until `analysed`.
+- **Surface `analysis_status` clearly** in the games list and game header: `Pending` / `Queued` / `Analysing` / `Analysed` / `Failed`.
+
+This gives onboarding instant value (a few games already analysed when the user first opens the games list) without burning compute on hundreds of historical games no one will open.

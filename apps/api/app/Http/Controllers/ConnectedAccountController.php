@@ -11,6 +11,7 @@ use App\Jobs\SyncChessComAccountJob;
 use App\Models\ConnectedAccount;
 use App\Models\Game;
 use Carbon\Carbon;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -54,10 +55,17 @@ class ConnectedAccountController extends Controller
 
         $normalised = strtolower($data['username']);
 
-        $account = ConnectedAccount::updateOrCreate(
-            ['user_id' => auth()->id(), 'platform' => $data['platform'], 'normalised_username' => $normalised],
-            ['username' => $data['username']],
-        );
+        try {
+            $account = ConnectedAccount::updateOrCreate(
+                ['user_id' => auth()->id(), 'platform' => $data['platform'], 'normalised_username' => $normalised],
+                ['username' => $data['username']],
+            );
+        } catch (UniqueConstraintViolationException) {
+            return response()->json(
+                ['message' => 'That account is already connected to another user.'],
+                409,
+            );
+        }
 
         return response()->json($this->formatAccount($account), $account->wasRecentlyCreated ? 201 : 200);
     }

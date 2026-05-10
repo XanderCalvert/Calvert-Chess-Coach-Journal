@@ -9,9 +9,9 @@ Rough mapping to this doc:
 | Registration | `/register` — name, email, password; redirects to `/onboarding` on first register |
 | Login | `/login` — email/password; redirects to `/onboarding` if no accounts linked, else `/games` |
 | Onboarding | `/onboarding` — required step: connect Chess.com or Lichess account before dashboard |
-| Game Import | `/import` — PGN paste, submit; gated: requires auth + at least one connected account |
-| Game List | `/games` — list with status; gated: requires auth + at least one connected account |
-| Game Detail / Replay | `/g/{share_code}` (primary); `/games/{id}/analysis` still available |
+| Manual PGN Import | `/import` — paste flow; **secondary** path. Should be reframed as "Import PGN manually" once the staged pipeline lands |
+| Game List | `/games` — primary post-onboarding surface. Should grow into "Your chess accounts" + "Recent games" with per-row analysis state and inline "Analyse this game" CTA |
+| Game Detail / Replay | `/g/{share_code}` (primary); `/games/{id}/analysis` still available. Currently assumes analysis exists — needs a `pending`-aware variant once sync stops auto-analysing every game |
 | Settings | `/settings` — profile (name, email) + "Your chess accounts" (add/remove linked accounts) |
 | Dashboard | Not a dedicated page yet |
 | Trends | Not `/patterns`; **profile** `/u/{username}` shows aggregate trends for a linked Chess.com account |
@@ -45,42 +45,82 @@ Empty state: Prompt to import the first game with a short explanation of what ha
 
 ---
 
-### Game Import Page
-**Purpose:** Accept a PGN and initiate analysis.
+### Manual PGN Import Page
+**Purpose:** Accept a one-off PGN and create the game record. Analysis is **opt-in**, not automatic.
+
+Reframing note: this page is the **secondary** import path. The primary import is connected-account sync. Use cases for manual PGN paste:
+
+- OTB games
+- club games
+- training positions
+- manually collected PGNs
+- games from unsupported sources
+
+Rename the page CTA from a generic "Import game" to **"Import PGN manually"** or **"Add one-off PGN"** so users understand it's the side door, not the front door.
 
 Components:
 - Large text area for PGN paste
 - PGN preview card once parsed: player names, date, opening, result, move count
-- "Analyse" button — disabled until PGN is valid
+- Primary action: "Add to my games" — creates the game in `pending` state without queuing analysis
+- Secondary action: "Add and analyse now" — same as above plus dispatches `AnalyseGameJob`
 - Error message area for invalid PGN
-- Progress indicator after analysis is triggered (stages: *Parsing moves… Running engine… Generating explanations…*)
 
-Empty state: Large text area with placeholder showing an example PGN snippet.
+Empty state: Large text area with placeholder showing an example PGN snippet, plus a link reminding the user that the main flow is to sync their Chess.com / Lichess account on `/games`.
 
 ---
 
-### Game List Page
-**Purpose:** Browse all previously imported and analysed games.
+### Game List Page (`/games`) — primary surface
+**Purpose:** The main entry point post-onboarding. Browse synced games, choose what to analyse, and reach individual game pages. The selection action is **"select a game to analyse"**, not "import a PGN".
 
-Components:
-- Table or card list: date, players, opening, result, accuracy, blunder count, status badge (Analysed / Pending / Failed)
-- Filter bar: colour, opening, date range, result
+Top section — **Your chess accounts**:
+- One row per linked account (e.g. `Chess.com: XanderCalvert [Sync]`, `Lichess: username [Sync]`)
+- Last synced timestamp + sync status per account
+- "Add chess account" link → `/settings`
+- Secondary link: **"Import PGN manually"** → manual PGN page
+
+Middle section — **Recent games**:
+- Filter bar: source (All / Chess.com / Lichess), colour, opening, date range, result, **analysis status** (All / Pending / Analysed / Failed)
 - Sort controls: by date, accuracy, blunder count
+
+Per-row content:
+- Date, players, opening, result, time control
+- **Analysis status badge** — `Pending` / `Queued` / `Analysing` / `Analysed` / `Failed`
+- For `analysed` rows: accuracy, blunder count
+- For `pending` / `failed` rows: an inline **"Analyse this game"** button that hits `POST /api/games/{id}/analyse`
+
+Empty state (no synced games yet): Prompt to sync the user's connected account, with manual PGN import as a side-door secondary action.
 
 ---
 
 ### Game Detail / Replay Page
-**Purpose:** The core screen — display a full game analysis.
+**Purpose:** The core screen. A game page **always exists once imported**, even before analysis. The page adapts to `analysis_status`.
 
-Components:
-- Game summary panel (top): players, date, opening, result, accuracy, blunder/mistake/inaccuracy counts, one-sentence summary
-- Interactive chess board (centred, prominent)
-- Move list panel (right): scrollable, colour-coded by severity
+Top header (always visible):
+- Game summary: players, date, opening, result, time control
+- **Analysis state badge** with last-updated timestamp
+- For `pending` / `failed` games: prominent **"Analyse this game"** CTA
+
+State: `pending` (imported but not analysed)
+- Interactive chess board with full replay
+- Move list panel (right): scrollable, plain SAN — no severity colouring yet
+- Navigation controls: previous/next move
+- Coaching / evaluation / key-moment panels are **locked** with an explanatory placeholder ("Analyse this game to unlock evaluations, key moments, and coaching.")
+
+State: `queued` / `analysing`
+- Same as `pending` plus a progress indicator on the locked panels (stages: *Queued… Running engine… Generating coaching…*)
+- Polling refreshes the page once status flips to `analysed`
+
+State: `analysed`
+- Full experience: Stockfish evaluations, move classifications, key moments, deterministic coaching, played-vs-best, engine line
+- Move list colour-coded by severity
 - Key moment cards (below board or right panel): top 3 moments with move number, tag badge, explanation preview
-- Engine line below board: e.g. `Best: Rf1+ Kh7 Qg6#`
-- Navigation controls: previous/next move, jump to key moment
+- Trend aggregation contributes this game to the user's coaching surfaces
 
-Empty state (analysis pending): Spinner and progress message.
+State: `failed`
+- Banner explaining the failure plus a **"Retry analysis"** button
+- Replay still works exactly as in `pending`
+
+The principle: **imported PGNs already have value before engine analysis.** The page should never look broken when analysis hasn't run.
 
 ---
 
@@ -137,20 +177,26 @@ Components:
 
 ## User Flows
 
-### First-Time User
+### First-Time User (primary flow)
 1. Arrive at home page — clear headline explaining the product
 2. Register with email and password
-3. **Connect chess account** — onboarding step, not optional settings: "Connect your Chess.com or Lichess account to start analysing your games." User enters their username; app imports recent games automatically.
-4. After first sync → redirected to dashboard/games list
-5. Prompted to open first analysed game
+3. **Connect chess account** — onboarding step, not optional settings: "Connect your Chess.com or Lichess account to start analysing your games." User enters their username; app imports recent games as **metadata only** (fast).
+4. The most-recent small subset (MVP target: 5 games) is auto-queued for Stockfish analysis so coaching has immediate signal.
+5. User lands on `/games` with all synced games already browsable (`pending` for the bulk, a few `analysing` / `analysed`).
+6. User picks a meaningful game (a recent loss, a specific opening) and clicks **"Analyse this game"** if it's not already analysed.
 
-### Paste PGN and Analyse
-1. Navigate to Import page
-2. Paste PGN string
-3. App validates and shows preview (players, date, opening, move count)
-4. Click "Analyse"
-5. Progress indicator shows stages
-6. On completion → redirected to game detail page
+### Habit loop (returning user)
+1. Sync recent games from `/games` (one click per linked account).
+2. New games appear immediately as `pending`; the recent subset auto-analyses.
+3. User reviews key games intentionally — analysing more games on demand as they choose.
+4. Coaching / trend quality improves over time as the analysed pool grows.
+
+### Manual PGN paste (secondary path)
+1. From `/games`, click "Import PGN manually".
+2. Paste PGN string.
+3. App validates and shows preview (players, date, opening, move count).
+4. Click **"Add to my games"** (game stored as `pending`) or **"Add and analyse now"** (game stored + `AnalyseGameJob` queued).
+5. Redirected to the game detail page, which works pre-analysis (board replay + metadata).
 
 ### Review Key Moments
 1. Open previously analysed game

@@ -52,16 +52,18 @@ php artisan chess:sync-connected-account chesscom YourName --recent
 **Behaviour notes**
 
 - Large accounts enqueue **many** import jobs; ensure workers and rate limits are acceptable for your environment.
-- Imports parse PGN and create games; analysis may be queued separately depending on your pipeline configuration.
+- Imports parse PGN and create games as **metadata only** (`analysis_status = pending`). Under the staged sync/analyse/coach pipeline (see [05-analysis-pipeline.md](./05-analysis-pipeline.md), [03-architecture.md](./03-architecture.md)), `SyncChessComAccountJob` auto-queues `AnalyseGameJob` only for a small recent subset (MVP target: the **5 most-recent newly imported** games per sync run). All other games stay `pending` until analysed on demand via `POST /api/v1/games/{id}/analyse` or `chess:analyse {game_id}` below.
 - HTTP uses a simple User-Agent (`CalvertChessCoach/1.0`); respect Chess.com’s public API usage.
 
 ---
 
 ## Game analysis (Stockfish)
 
+In the staged pipeline, sync no longer auto-queues analysis for every imported game. The commands below are how operators run the **expensive layer** explicitly.
+
 ### `chess:analyse`
 
-Run analysis for a **single** game by UUID (useful for local debugging).
+Run analysis for a **single** game by UUID (useful for local debugging or covering a `pending` game outside the recent auto-analyse subset).
 
 ```sh
 php artisan chess:analyse {game_id} [--force]
@@ -77,6 +79,8 @@ php artisan chess:reanalyse --game_id=<uuid> [--game_id=<uuid> ...]
 ```
 
 You must pass either `--all` or at least one `--game_id`.
+
+> **Cost note:** `--all` will analyse *every* imported game including ones the user has never opened. Under the staged pipeline this is the operator's intentional override of the on-demand model. Prefer per-game runs in production.
 
 ---
 

@@ -29,28 +29,93 @@ Most chess tools stop at accuracy percentages, blunder counts, and eval graphs. 
 
 > Why do you repeatedly lose in this specific way?
 
+### Core Product Framing
+
+The app is a **quantified-self platform for chess improvement**, not a generic Stockfish frontend. The central product value the user should feel is:
+
+> "This understands my chess."
+
+Every architectural and UX decision should be measured against that principle.
+
+---
+
+### Pipeline Direction — Sync vs Analysis vs Coaching
+
+The product treats sync, analysis, and coaching as **distinct states** that should never be conflated:
+
+```text
+Imported   — game exists locally with PGN + metadata
+Analysed   — Stockfish evaluation completed
+Coached    — coaching/key-moment/trend data generated
+```
+
+The legacy "sync account → import all games → immediately analyse every game with Stockfish" model is replaced by a staged pipeline:
+
+```text
+Sync metadata
+    ↓
+Analyse selectively (auto for a small recent subset, on demand otherwise)
+    ↓
+Generate coaching insights from analysed games
+```
+
+This split aligns with the long-term self-coaching direction and significantly improves scalability, cost control, and UX. See [05-analysis-pipeline.md](./05-analysis-pipeline.md) and [03-architecture.md](./03-architecture.md) for the technical shape.
+
+Key implications for scope:
+
+- Sync is a **cheap, fast metadata import** (PGN, moves, result, opening, date, time control, ratings, opponent).
+- Stockfish analysis is **the expensive layer** — auto-run only for a small recent subset (MVP target: most-recent 5 games per sync), on demand for everything else.
+- Coaching depth grows progressively as more games are analysed; the coaching layer reads analysed games, so unlocking richer coaching is a natural reward for analysing more.
+- Premium tier value should focus on **long-term personalised improvement insights**, not on simply paying for Stockfish access.
+
 ---
 
 ### Features
-1. **PGN Import** — paste a PGN string; app parses moves, headers, metadata; validation with readable errors
-2. **Stockfish Analysis** — server-side evaluation per position; centipawn scores, best move, 3–4 move engine line stored; background job with progress indicator
-3. **Key Moment Identification** — top 3 moves by centipawn loss; classified as blunder (>150cp), mistake (>50cp), inaccuracy (>20cp); one per game phase preferred
-4. **Plain-English Explanations** — LLM-generated, 2–4 sentences per key moment; factually grounded in position data
-5. **Played Move vs Best Move** — side-by-side board view with engine line below
-6. **Mistake Tagging** — one primary tag per key moment; heuristic detection for MVP tags; user can override
-7. **Game Summary** — LLM-generated paragraph; opening, accuracy, key moment count, top theme
-8. **Basic Trend Tracking** — per-game summary row stored; trends page with table and line chart
-9. **Manual Notes / Club Feedback** — freetext notes on games and key moments; coach agreed/disagreed toggle
+1. **Connected Account Sync (primary import path)** — link a Chess.com / Lichess identity; app pulls PGN, moves, result, opening, date, time control, ratings, and opponent for each game; metadata import is the cheap, default operation
+2. **Manual PGN Import (secondary)** — paste a PGN for one-off / OTB / club / training positions / unsupported sources; reframed as "Import PGN manually" rather than the primary entry point
+3. **Selective Stockfish Analysis** — server-side evaluation per position; centipawn scores, best move, 3–4 move engine line stored; auto-run for a small recent subset after sync (MVP: most-recent 5 games), on demand via "Analyse this game" for everything else; analysis state surfaced in UI (`pending` / `queued` / `analysing` / `analysed` / `failed`)
+4. **Key Moment Identification** — top 3 moves by centipawn loss; classified as blunder (>150cp), mistake (>50cp), inaccuracy (>20cp); one per game phase preferred
+5. **Plain-English Explanations** — LLM-generated, 2–4 sentences per key moment; factually grounded in position data
+6. **Played Move vs Best Move** — side-by-side board view with engine line below
+7. **Mistake Tagging** — one primary tag per key moment; heuristic detection for MVP tags; user can override
+8. **Game Summary** — LLM-generated paragraph; opening, accuracy, key moment count, top theme
+9. **Basic Trend Tracking** — per-game summary row stored; trends page with table and line chart; coaching depth grows progressively as more games are analysed
+10. **Manual Notes / Club Feedback** — freetext notes on games and key moments; coach agreed/disagreed toggle
 
 ### MVP Definition of Done
-- User can paste a PGN and receive a fully analysed game within 60 seconds
-- Three key moments identified with explanations describing the *idea*, not just the score
+- User can connect a chess account and the app imports games quickly as **metadata-only** (no full Stockfish run-through of the entire archive)
+- After sync, the most-recent small subset (target: 5 games) is auto-analysed so coaching widgets have immediate signal
+- Any other imported game can be analysed on demand from the games list or game page in ~60 seconds
+- Manual PGN import remains available as a secondary "Import PGN manually" path
+- Three key moments per analysed game with explanations describing the *idea*, not just the score
 - Each mistake has a tag that the user can override
 - User can add a club note and mark coach agreement
-- Trends page shows accuracy and mistake frequency across all analysed games
+- Trends page shows accuracy and mistake frequency across all analysed games (improves as more games are analysed)
 - Dashboard provides a useful at-a-glance summary
 - App is deployed and accessible at a public URL
 - README explains the architecture and how to run it locally
+
+---
+
+### Free vs Premium Alignment
+
+The staged pipeline maps cleanly to future monetisation. This is not an MVP feature, but architecture should not block it:
+
+**Cheap layer (free tier candidate)**
+- Connecting accounts
+- Syncing games (metadata)
+- Browsing / replaying games
+- A limited analysis quota
+- Basic coaching surfaces
+
+**Expensive / value layer (premium tier candidate)**
+- Unlimited analysis
+- Priority queue
+- Advanced coaching trends
+- Opening reports
+- Recurring mistake detection
+- Longitudinal improvement tracking
+- Future AI explanations and conversational coaching
 
 ---
 
@@ -106,8 +171,11 @@ Most chess tools stop at accuracy percentages, blunder counts, and eval graphs. 
 
 Given what is already implemented, focus next on:
 
-1. **Plain-English explanations + key-moment cards** in the game analysis experience
-2. **Heuristic mistake tagging** (MVP subset, conservative rules)
-3. **Authentication and user ownership** of games/connected accounts
-4. **Notes + coach agreement** to complete the journal loop
-5. **Dedicated trends/dashboard pages** after explanation/tagging quality is solid
+1. **Split sync from analysis** — sync should import metadata only and stop auto-queuing analysis for every imported game; auto-analyse only a small recent subset (target: 5)
+2. **On-demand analysis endpoint + UI** — `POST /api/games/{id}/analyse` plus an "Analyse this game" CTA on the games list and game page for any `pending` game
+3. **Game page works pre-analysis** — board replay, opening/result metadata, and "Analyse this game" CTA visible before engine analysis runs
+4. **Reposition manual PGN import as secondary** — rename the CTA to "Import PGN manually" / "Add one-off PGN"; the games list becomes the primary surface, not `/import`
+5. **Plain-English explanations + key-moment cards** in the game analysis experience
+6. **Heuristic mistake tagging** (MVP subset, conservative rules)
+7. **Notes + coach agreement** to complete the journal loop
+8. **Dedicated trends/dashboard pages** after explanation/tagging quality is solid

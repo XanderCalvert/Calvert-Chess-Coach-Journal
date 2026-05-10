@@ -10,22 +10,31 @@ Tick `- [ ]` → `- [x]` as you complete items. In GitHub or many editors, check
 
 The highest-value order from current state:
 
-1. **Key moments + plain-English explanations end-to-end**
+1. **Split sync from analysis (staged pipeline)**
+   - Sync should import metadata only (PGN, moves, result, opening, date, time control, ratings, opponent).
+   - Stop auto-queuing `AnalyseGameJob` for every imported/synced game.
+   - Auto-analyse only the **5 most-recent newly imported** games per sync run.
+   - Migrate `analysis_status` enum to `pending` / `queued` / `analysing` / `analysed` / `failed`.
+   - Add `POST /api/v1/games/{id}/analyse` for on-demand analysis.
+2. **Game list + game page work for `pending` games**
+   - Games list shows analysis state per row + inline "Analyse this game" for `pending` / `failed`.
+   - Game detail page renders board replay + metadata before analysis; coaching panels lock until `analysed`.
+   - Reframe `/import` as "Import PGN manually" — secondary path; primary entry remains the games list.
+3. **Key moments + plain-English explanations end-to-end**
    - Persist/select top key moments reliably per analysed game.
    - Generate cached low-temperature explanations from deterministic board context.
    - Render key-moment cards in `/g/{share_code}` with jump-to-position support.
-2. **Heuristic mistake tags (MVP subset)**
+4. **Heuristic mistake tags (MVP subset)**
    - Start with conservative rules for 3–5 tags. *(move-level deterministic themes are in place)*
    - Store and display tags on key moments; user override can follow.
-3. **Auth + user-owned persistence**
-   - Add login/session and connect imported/manual games to user accounts.
-4. **Journal UX basics**
+5. **Journal UX basics**
    - Manual notes + coach agreement path.
    - Lightweight summary/recommendation surfaces.
-5. **Then scale breadth**
+6. **Then scale breadth**
    - Dedicated trends/dashboard routes, Lichess import, polish/deploy.
+   - Progressive coaching unlocks tied to count of analysed games (e.g. "Analyse 5 games to unlock your coaching report").
 
-This keeps the core promise strong before expanding scope.
+This keeps the core promise strong while aligning the engine pipeline with the long-term self-coaching, scalable, premium-ready direction.
 
 ---
 
@@ -71,6 +80,30 @@ Use this section as the canonical sequence. It consolidates planning from:
 - [x] Render explanation content in key-moment view
 - [x] Ensure jump-to-position flow is smooth from each key moment
 
+### Phase 3.5 — Staged Sync / Analyse / Coach Pipeline (New, current priority)
+
+The product is moving from "sync → analyse everything" to a staged pipeline of `Imported` → `Analysed` → `Coached` (see [03-architecture.md](./03-architecture.md), [05-analysis-pipeline.md](./05-analysis-pipeline.md)). This is the gating change for scalability, on-demand analysis UX, and future free/premium tiering.
+
+Backend
+- [ ] Migrate `games.analysis_status` enum to `pending` / `queued` / `analysing` / `analysed` / `failed`; add `analysis_requested_at`
+- [ ] Update `ImportExternalGameJob` so it **does not** auto-dispatch `AnalyseGameJob` for every imported game
+- [ ] Update `SyncChessComAccountJob` to select the recent auto-analyse subset (MVP: 5 most-recent newly imported games per sync run) and dispatch `AnalyseGameJob` only for those
+- [ ] Manual PGN import (`POST /api/v1/games`) defaults to `analysis_status = pending`; an opt-in flag triggers immediate analysis
+- [ ] New endpoint `POST /api/v1/games/{id}/analyse` — ownership-gated; sets `queued`, dispatches `AnalyseGameJob`
+- [ ] `AnalyseGameJob` writes `analysing` on start and `analysed` (or `failed`) on completion
+
+Frontend
+- [ ] Games list: per-row analysis state badge + inline "Analyse this game" button for `pending` / `failed`
+- [ ] Games list: filter by analysis status; "Your chess accounts" header section with per-account Sync controls
+- [ ] Game detail page: works for `pending` games (board + metadata + Analyse CTA); coaching panels locked until `analysed`; retry control on `failed`
+- [ ] Polling / refresh while a game is `queued` / `analysing`
+- [ ] Reframe `/import` as **"Import PGN manually"** secondary path (CTA wording, copy, navigation prominence)
+
+Tests / observability
+- [ ] Sync integration test: importing N games queues exactly the recent-subset-sized analysis fan-out
+- [ ] On-demand analyse endpoint test: ownership, idempotency, status transitions
+- [ ] Game detail renders for `pending` without errors
+
 ### Phase 4 — AI Narration Layer (After deterministic loop is complete)
 
 - [ ] Add narration service that consumes structured coaching columns (not raw engine dumps alone)
@@ -98,6 +131,8 @@ Connected accounts are the user's **chess identity**, not optional integrations.
 - [ ] Add recurring-mistake cards (most common category, phase, opening/structure context)
 - [ ] Introduce stored trend summaries if query-time aggregation becomes insufficient
 - [ ] Surface clear next study action from trend outputs
+- [ ] Progressive coaching unlocks tied to count of analysed games (e.g. "Analyse 5 games to unlock your coaching report"; "Analyse 20 to unlock recurring mistake trends")
+- [ ] Lay the groundwork for free/premium split: free tier = sync + browse + limited analysis quota + basic coaching; premium = unlimited analysis + advanced trends + AI explanations (see [02-scope.md](./02-scope.md))
 
 ### Phase 7 — UX and Surface Completion
 
@@ -117,15 +152,15 @@ Connected accounts are the user's **chess identity**, not optional integrations.
 
 ## Canonical Pre-AI Player Analysis Pipeline
 
-This is the deterministic pipeline that should be complete before depending on AI prose:
+This is the deterministic pipeline that should be complete before depending on AI prose. It is **staged** — sync, analyse, and coach are independent steps:
 
-1. Import/sync games
-2. Parse + persist moves
+1. Sync / import games (metadata + moves only — cheap, fast, every game)
+2. Trigger Stockfish analysis per game **selectively**: auto for the recent subset (MVP: 5 most-recent newly imported), on demand otherwise
 3. Run Stockfish analysis per move
 4. Compute cp loss + move classification
 5. Generate deterministic coaching columns (`themes`, tactical flags, threat response, risk note)
 6. Select and tag key moments
-7. Aggregate by player (time windows, phase, opening/theme, recurring categories)
+7. Aggregate by player (time windows, phase, opening/theme, recurring categories) — coaching depth scales with the count of analysed games
 8. Expose structured outputs to UI and (later) AI narration
 
 AI should narrate this structured output, not replace it.

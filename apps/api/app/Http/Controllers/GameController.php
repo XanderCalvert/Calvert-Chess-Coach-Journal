@@ -25,20 +25,21 @@ class GameController extends Controller
             ->orderByDesc('created_at')
             ->get()
             ->map(fn (Game $g) => [
-                'id'               => $g->id,
-                'white_player'     => $g->white_player,
-                'black_player'     => $g->black_player,
-                'result'           => $g->result->value,
-                'played_at'        => $g->played_at?->toDateString(),
-                'eco_code'         => $g->eco_code,
-                'opening_name'     => $g->opening_name,
-                'move_count'       => $g->move_count,
-                'analysis_status'  => $g->analysis_status->value,
-                'accuracy_pct'     => $g->accuracy_pct,
-                'blunder_count'    => $g->blunder_count,
-                'mistake_count'    => $g->mistake_count,
-                'inaccuracy_count' => $g->inaccuracy_count,
-                'share_code'       => $g->share_code,
+                'id'                   => $g->id,
+                'connected_account_id' => $g->connected_account_id,
+                'white_player'         => $g->white_player,
+                'black_player'         => $g->black_player,
+                'result'               => $g->result->value,
+                'played_at'            => $g->played_at?->toDateString(),
+                'eco_code'             => $g->eco_code,
+                'opening_name'         => $g->opening_name,
+                'move_count'           => $g->move_count,
+                'analysis_status'      => $g->analysis_status->value,
+                'accuracy_pct'         => $g->accuracy_pct,
+                'blunder_count'        => $g->blunder_count,
+                'mistake_count'        => $g->mistake_count,
+                'inaccuracy_count'     => $g->inaccuracy_count,
+                'share_code'           => $g->share_code,
             ]);
 
         return response()->json($games);

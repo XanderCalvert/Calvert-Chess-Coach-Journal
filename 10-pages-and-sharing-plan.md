@@ -16,17 +16,27 @@ The emphasis is educational feedback rather than raw engine lines.
 
 ## Core User Flow
 
+The product loop is staged — sync is cheap and runs over the whole archive, analysis is selective and run for a small recent subset automatically (MVP: 5 most-recent games) plus anything the user explicitly chooses, and coaching depth grows progressively as the analysed pool grows:
+
 ```text
-Import Game
+Register / login
     ↓
-Analyse Game
+Connect chess identity (Chess.com / Lichess)
     ↓
-Review Mistakes
+Sync games (metadata only — fast)
     ↓
-Identify Patterns
+Recent subset auto-analysed
     ↓
-Share Analysis
+User reviews key games
+    ↓
+User analyses more games intentionally
+    ↓
+Coaching / trend quality improves over time
+    ↓
+User keeps syncing regularly
 ```
+
+Manual PGN paste remains as a **secondary** "Import PGN manually" path (OTB games, club games, training positions, manually collected PGNs, games from unsupported sources).
 
 ---
 
@@ -46,46 +56,79 @@ Share Analysis
 - Shareable analysis examples
 - Import CTA
 
-### Import Page (`/import`)
+### Manual PGN Import Page (`/import`) — secondary path
 
 **Purpose**
-- Paste PGN
-- Upload PGN (later)
-- Select colour played
-- Submit game for analysis
+- One-off PGN paste for OTB / club / training / unsupported-source games
+- Reframed as **"Import PGN manually"** / **"Add one-off PGN"** — explicitly *not* the primary entry point
 
 **Inputs**
 - PGN textarea
 - Colour played
 - Import source
 
-### Games List (`/games`)
+**Behaviour**
+- Default action: "Add to my games" — creates the game with `analysis_status = pending`, no `AnalyseGameJob` queued
+- Secondary action: "Add and analyse now" — same plus dispatches analysis
+- After save → redirect to game detail page (which works pre-analysis)
+
+### Games List (`/games`) — primary surface
 
 **Purpose**
-- View imported games
+- The main entry point post-onboarding
+- Browse synced games and **choose a game to analyse**
 
-**Columns**
-- Opponent
-- Result
-- Opening
-- Date
-- Analysis status
-- Mistake count
+**Top section — Your chess accounts**
+```text
+Chess.com: XanderCalvert   [Sync]
+Lichess:   username        [Sync]
+```
+Per-account: last synced timestamp, sync status. Side links: "Add chess account", "Import PGN manually".
+
+**Recent games**
+- Filter: source (All / Chess.com / Lichess), colour, opening, date range, result, **analysis status**
+- Sort: by date, accuracy, blunder count
+
+**Per-row content**
+- Date, opponent, result, opening, time control
+- Analysis status badge: `Pending` / `Queued` / `Analysing` / `Analysed` / `Failed`
+- For `analysed` rows: accuracy, mistake/blunder counts
+- For `pending` / `failed` rows: inline **"Analyse this game"** button → `POST /api/games/{id}/analyse`
+
+The primary interaction on this page is **"select a game to analyse"**, not "import a PGN".
 
 ### Game Analysis Page (`/games/[id]`)
 
 **Purpose**
 - Main analysis experience (centrepiece page)
+- Always available once a game is imported, even before analysis
 
-**Features**
-- Interactive board
-- Move list
-- Evaluation graph
-- Key mistakes
-- Better move suggestions
-- Human explanations
-- Engine lines
-- Accuracy summary
+**Behaviour by `analysis_status`**
+
+`pending` (imported, not analysed):
+- Interactive board with full replay
+- Opening / result / time control metadata visible
+- Move list (plain SAN, no severity colouring)
+- Prominent **"Analyse this game"** CTA
+- Coaching / evaluation / key-moment panels locked with a "Analyse this game to unlock evaluations, key moments, and coaching." placeholder
+
+`queued` / `analysing`:
+- Same as pending plus a progress indicator on the locked panels (Queued → Running engine → Generating coaching)
+- Polls and auto-refreshes when status flips to `analysed`
+
+`analysed`:
+- Stockfish evaluations
+- Move classifications
+- Key moments
+- Deterministic coaching
+- Trend aggregation contributions
+- Played-vs-best, engine line, plain-English explanations, accuracy summary
+
+`failed`:
+- Banner explaining the failure plus a **"Retry analysis"** button
+- Replay still works as in `pending`
+
+The principle: **imported PGNs already have value before engine analysis runs.** The page should be useful in every state, not blank until analysis completes.
 
 ### Review / Training Mode (`/games/[id]/review`)
 
@@ -276,22 +319,33 @@ Potential features:
 
 ## Planned Analysis Pipeline
 
+The pipeline is **staged** — sync, analyse, and coach are independent stages. The expensive Stockfish work is gated behind either the recent-subset auto rule or an explicit user action. Full detail in [05-analysis-pipeline.md](./05-analysis-pipeline.md).
+
 ```text
-Import PGN
-    ↓
-Parse moves
-    ↓
-Persist game
-    ↓
-Queue Stockfish analysis
-    ↓
-Store evaluations
-    ↓
-Identify mistakes
-    ↓
-Generate explanations
-    ↓
-Expose to frontend
+Stage A — Sync / Import (cheap, every game)
+    Sync connected account or paste PGN
+        ↓
+    Parse moves
+        ↓
+    Persist game (analysis_status = pending)
+        ↓
+    Recent subset (MVP: 5 newest) auto-queued for analysis
+
+Stage B — Analyse (expensive, selective)
+    Recent-subset rule OR POST /api/games/{id}/analyse
+        ↓
+    Stockfish per move
+        ↓
+    Store evaluations + classifications (analysis_status = analysed)
+
+Stage C — Coach (derived from analysed games)
+    Identify mistakes / select key moments
+        ↓
+    Generate explanations
+        ↓
+    Update trends / coaching surfaces
+        ↓
+    Expose to frontend
 ```
 
 ---
@@ -322,11 +376,15 @@ Expose to frontend
 
 ## Long-Term Vision
 
-A polished chess improvement platform focused on:
+A **quantified-self platform for chess improvement**, focused on:
 
 - Understanding mistakes
 - Recognising patterns
 - Improving decision making
 - Sharing analysis socially
 
-Rather than simply displaying engine evaluations.
+Rather than simply being a generic Stockfish frontend. The central product value the user should feel is:
+
+> "This understands my chess."
+
+The staged sync / analyse / coach pipeline exists in service of that — sync is cheap and instant, analysis is intentional and reserved for games the user actually wants insight on, and coaching depth grows as the analysed pool grows. This also maps cleanly onto a future free/premium split where the cheap layer (sync + browse + limited analysis) is free and the expensive value layer (unlimited analysis, advanced coaching trends, AI explanations) is premium.

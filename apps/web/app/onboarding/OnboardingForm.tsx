@@ -54,10 +54,10 @@ export default function OnboardingForm() {
           id="platform"
           value={platform}
           onChange={e => setPlatform(e.target.value)}
-          className="border rounded px-3 py-2 text-sm bg-white"
+          className="border border-neutral-600 rounded px-3 py-2 text-sm bg-white text-neutral-900"
         >
           {PLATFORMS.map(p => (
-            <option key={p.value} value={p.value}>
+            <option key={p.value} value={p.value} className="bg-white text-neutral-900">
               {p.label}
             </option>
           ))}

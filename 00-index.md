@@ -56,13 +56,14 @@ Use [09-build-roadmap.md](./09-build-roadmap.md) for detailed checkboxes. Summar
 
 Current priority order (short version):
 
-1. **Key moments + LLM explanations in product UI** (`/g/{share_code}`)
-2. **Heuristic mistake tags** (small conservative subset first)
-3. **Auth + user-owned games/profiles**
-4. **Notes + coaching/journal loop**
-5. **Dedicated dashboard/trends pages**, then Lichess and polish
+1. **Split sync from analysis (staged pipeline)** — sync imports metadata only; auto-analyse only the recent subset (MVP: 5 most-recent newly imported); add `POST /api/v1/games/{id}/analyse`; new `analysis_status` enum (`pending` / `queued` / `analysing` / `analysed` / `failed`)
+2. **Game list + game page work for `pending` games** — inline "Analyse this game", coaching panels locked until `analysed`, retry on `failed`; reframe `/import` as "Import PGN manually"
+3. **Key moments + LLM explanations in product UI** (`/g/{share_code}`)
+4. **Heuristic mistake tags** (small conservative subset first)
+5. **Notes + coaching/journal loop**
+6. **Dedicated dashboard/trends pages**, then Lichess and polish
 
-See details in [09-build-roadmap.md](./09-build-roadmap.md) and [11-profile-plan.md](./11-profile-plan.md).
+See details in [09-build-roadmap.md](./09-build-roadmap.md) (Phase 3.5), [05-analysis-pipeline.md](./05-analysis-pipeline.md) (staged pipeline), [03-architecture.md](./03-architecture.md), and [11-profile-plan.md](./11-profile-plan.md).
 
 ---
 

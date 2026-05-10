@@ -4,6 +4,30 @@ All tables use UUID primary keys. **Target:** data scoped to the authenticated u
 
 ---
 
+## Game lifecycle states
+
+A game's lifecycle is split into three independent concepts. They are surfaced via `games.analysis_status` (engine state) plus the existence of related rows (key moments, summary, trend deltas) for the coaching state. They should not be conflated in code or UI:
+
+```text
+Imported   — Games row exists with PGN + Moves rows; analysis_status = pending
+Analysed   — Stockfish run complete; analysis_status = analysed; engine_analyses + classifications populated
+Coached    — Key moments, explanations, summary, and trend deltas generated
+```
+
+`analysis_status` enum:
+
+| State | Meaning |
+|-------|---------|
+| `pending` | Imported but no analysis run. Game page renders board + metadata; "Analyse this game" CTA shown. |
+| `queued` | `AnalyseGameJob` enqueued but not yet picked up by a worker. |
+| `analysing` | Worker actively running Stockfish for this game. |
+| `analysed` | Engine analysis + per-move classifications complete. Coaching surfaces unlock from here. |
+| `failed` | Job errored. User can retry via `POST /games/{id}/analyse`. |
+
+Note: previous values (`running`, `complete`) are superseded by `analysing` and `analysed` respectively. Treat the migration as a rename, not a data change.
+
+---
+
 ## Users
 
 | Field | Type | Description |
@@ -39,7 +63,8 @@ All tables use UUID primary keys. **Target:** data scoped to the authenticated u
 | `mistake_count` | integer | |
 | `inaccuracy_count` | integer | |
 | `summary_text` | text | LLM-generated summary |
-| `analysis_status` | enum | `pending` \| `running` \| `complete` \| `failed` |
+| `analysis_status` | enum | `pending` \| `queued` \| `analysing` \| `analysed` \| `failed` (was: `pending` \| `running` \| `complete` \| `failed`) |
+| `analysis_requested_at` | timestamp, nullable | When the most recent analysis was triggered (auto-subset rule or explicit `POST /games/{id}/analyse`) |
 | `imported_from` | enum | `paste` \| `chesscom` \| `lichess` |
 | `external_id` | string, nullable | For deduplication on import |
 | `share_code` | string(8), nullable, unique | Public `/g/{share_code}` URL key |
@@ -201,5 +226,7 @@ All tables use UUID primary keys. **Target:** data scoped to the authenticated u
 
 - [x] Schema + models for games, moves, engine analyses, key moments (table), mistake tags (seeded), manual notes, trend summaries (table)
 - [x] Connected accounts + Chess.com import metadata on games
+- [ ] `analysis_status` enum migrated to `pending` / `queued` / `analysing` / `analysed` / `failed`
+- [ ] `analysis_requested_at` column added; sync no longer auto-queues analysis for every imported game (only the recent subset)
 - [ ] Key moments + explanations populated end-to-end in UI for every analysed game
 - [ ] Trend summary rows driven by product “trends” page (profile uses **query-time** stats instead)

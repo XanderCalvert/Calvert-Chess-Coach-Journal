@@ -330,13 +330,16 @@ Chess.com only. No OAuth — public username-based archive access.
 
 ### Sync Flow
 
+Sync imports **metadata only**. Stockfish does not run for every imported game; it auto-runs only for the recent subset (MVP target: 5 most-recent newly imported games per sync run). Everything else stays `analysis_status = pending` until the user explicitly clicks "Analyse this game". See [05-analysis-pipeline.md](./05-analysis-pipeline.md) for the staged pipeline.
+
 ```text
 User enters Chess.com username
 → app creates/updates connected account
 → app fetches monthly game archives
-→ app imports recent games (UI) or full history (CLI)
-→ imported games are queued for analysis
-→ profile stats update after analysis completes (query-time aggregation)
+→ app imports recent games (UI) or full history (CLI) — metadata only, fast
+→ recent subset (MVP: 5 newest) is auto-queued for analysis
+→ everything else stays analysis_status = pending until the user analyses it on demand
+→ profile stats update progressively as more games reach analysed (query-time aggregation)
 ```
 
 ### Sync Controls
@@ -375,9 +378,9 @@ connected account + Chess.com game uuid (stored as external_id on games)
 
 - [x] User can enter a Chess.com username
 - [x] App imports recent games without duplicate records
-- [x] Imported games are queued for Stockfish analysis
 - [x] Sync can be re-run safely
 - [x] Profile page shows updated game count after sync
+- [ ] **Updated:** sync no longer queues `AnalyseGameJob` for every imported game; only the recent auto-analyse subset (MVP: 5 most-recent newly imported) is auto-queued. All other games are `analysis_status = pending` until the user triggers analysis via `POST /api/v1/games/{id}/analyse`.
 
 ---
 
@@ -672,7 +675,11 @@ Chess.com public sync is **implemented** (`SyncChessComAccountJob`, profile + CL
 
 ### Analysis Volume
 
-Web sync: newest **20** games. **Full archive:** `chess:sync-connected-account` without `--recent` ([ADMIN-GUIDE.md](./ADMIN-GUIDE.md)).
+**Sync vs analysis are split.** Sync imports metadata only (cheap). Stockfish runs only for the recent auto-analyse subset and explicit on-demand requests.
+
+- Web sync (default): newest **20** games imported as metadata; auto-analyse only the **5 most-recent newly imported** games per sync run.
+- CLI full archive: `chess:sync-connected-account` without `--recent` imports the full history as metadata; the same recent-subset rule applies for auto-analysis (everything else remains `pending` and is analysed on demand). See [ADMIN-GUIDE.md](./ADMIN-GUIDE.md).
+- The user can analyse any other imported game from the games list / game page via `POST /api/v1/games/{id}/analyse`.
 
 ### Public vs Private Profiles
 

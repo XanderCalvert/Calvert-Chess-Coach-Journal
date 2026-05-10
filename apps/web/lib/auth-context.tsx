@@ -2,11 +2,18 @@
 
 import { createContext, useContext, useState } from 'react'
 
+export type ExplanationDepth = 'beginner' | 'club' | 'experienced'
+
 export interface AuthUser {
   id: string
   email: string
   display_name: string | null
   has_connected_accounts: boolean
+  /** From Laravel User; optional until API guarantees shape */
+  created_at?: string
+  email_verified_at?: string | null
+  explanation_depth?: ExplanationDepth | null
+  rating_estimate?: number | null
 }
 
 interface AuthContextValue {

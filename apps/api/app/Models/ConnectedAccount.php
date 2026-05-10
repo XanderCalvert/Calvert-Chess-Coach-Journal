@@ -13,6 +13,10 @@ class ConnectedAccount extends Model
 {
     use HasUuids;
 
+    protected $attributes = [
+        'sync_status' => 'never_synced',
+    ];
+
     protected $fillable = [
         'user_id',
         'platform',
