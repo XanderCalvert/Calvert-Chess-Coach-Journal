@@ -2,7 +2,7 @@
 
 Tick `- [ ]` → `- [x]` as you complete items. In GitHub or many editors, checkboxes are clickable.
 
-> **Repo snapshot (May 2026):** Full **PGN → analyse → review** loop works: import (UI + API), Stockfish via queues, CP loss + classifications, interactive `/g/{share_code}` with `?ply=N`, games list. Deterministic coaching metadata is now generated and rendered at move level (`themes`, tactical flags, threat awareness, risk notes). **Chess.com profiles:** `connected_accounts`, `/u/{username}`, web sync (20-game window), query-time stats + sparklines, game-type filter, `ImportExternalGameJob` dedup. **Operators:** `chess:sync-connected-account` for full-archive pulls ([ADMIN-GUIDE.md](./ADMIN-GUIDE.md)). **Auth + onboarding:** Sanctum registration/login, `chess_token` cookie, onboarding gate (connect account required before dashboard), `/settings` page (add/remove chess accounts), full user-scoped queries, sync ownership enforced. Still outstanding: LLM-generated explanations, dedicated dashboard/trends pages, club notes, production deploy.
+> **Repo snapshot (May 2026):** Full **PGN → analyse → review** loop works: import (UI + API), Stockfish via queues, CP loss + classifications, interactive `/g/{share_code}` with `?ply=N`, games list. Deterministic coaching metadata is generated and rendered at move level (`themes`, tactical flags, threat awareness, risk notes). **Chess.com profiles:** `connected_accounts`, `/u/{username}`, web sync (20-game window), query-time stats + sparklines, game-type filter, `ImportExternalGameJob` dedup. **Operators:** `chess:sync-connected-account` for full-archive pulls ([ADMIN-GUIDE.md](./ADMIN-GUIDE.md)). **Auth + onboarding:** Sanctum registration/login, `chess_token` cookie, onboarding gate (connect account required before dashboard), `/settings` page (add/remove chess accounts), full user-scoped queries, sync ownership enforced. **Key moments:** selection + persistence + ranked rendering on `/g/{share_code}` via `KeyMomentsPanel`. **Staged sync vs analyse pipeline:** `ImportExternalGameJob` no longer auto-dispatches analysis; `QueueRecentAnalysisJob` queues only the most-recent N pending games (default 5, env-configurable); `POST /api/v1/games/{id}/analyse` powers on-demand analysis from the games list. Still outstanding: `pending`-aware game detail page, `analysis_status` enum rename + `analysis_requested_at`, LLM-generated explanations, dedicated dashboard/trends pages, club notes, production deploy.
 
 ---
 
@@ -80,24 +80,24 @@ Use this section as the canonical sequence. It consolidates planning from:
 - [x] Render explanation content in key-moment view
 - [x] Ensure jump-to-position flow is smooth from each key moment
 
-### Phase 3.5 — Staged Sync / Analyse / Coach Pipeline (New, current priority)
+### Phase 3.5 — Staged Sync / Analyse / Coach Pipeline (In progress)
 
-The product is moving from "sync → analyse everything" to a staged pipeline of `Imported` → `Analysed` → `Coached` (see [03-architecture.md](./03-architecture.md), [05-analysis-pipeline.md](./05-analysis-pipeline.md)). This is the gating change for scalability, on-demand analysis UX, and future free/premium tiering.
+The product is moving from "sync → analyse everything" to a staged pipeline of `Imported` → `Analysed` → `Coached` (see [03-architecture.md](./03-architecture.md), [05-analysis-pipeline.md](./05-analysis-pipeline.md)). This is the gating change for scalability, on-demand analysis UX, and future free/premium tiering. Commit 748bc51 landed the backend split + games-list UX.
 
 Backend
-- [ ] Migrate `games.analysis_status` enum to `pending` / `queued` / `analysing` / `analysed` / `failed`; add `analysis_requested_at`
-- [ ] Update `ImportExternalGameJob` so it **does not** auto-dispatch `AnalyseGameJob` for every imported game
-- [ ] Update `SyncChessComAccountJob` to select the recent auto-analyse subset (MVP: 5 most-recent newly imported games per sync run) and dispatch `AnalyseGameJob` only for those
-- [ ] Manual PGN import (`POST /api/v1/games`) defaults to `analysis_status = pending`; an opt-in flag triggers immediate analysis
-- [ ] New endpoint `POST /api/v1/games/{id}/analyse` — ownership-gated; sets `queued`, dispatches `AnalyseGameJob`
-- [ ] `AnalyseGameJob` writes `analysing` on start and `analysed` (or `failed`) on completion
+- [ ] Migrate `games.analysis_status` enum to `pending` / `queued` / `analysing` / `analysed` / `failed`; add `analysis_requested_at` (still using `pending` / `running` / `complete` / `failed` in code)
+- [x] Update `ImportExternalGameJob` so it **does not** auto-dispatch `AnalyseGameJob` for every imported game (commit 748bc51)
+- [x] Update `SyncChessComAccountJob` to select the recent auto-analyse subset and dispatch `AnalyseGameJob` only for those — implemented as `QueueRecentAnalysisJob` (60s delay, default 5 most-recent pending per account, env `CHESS_AUTO_ANALYSE_ON_SYNC`)
+- [ ] Manual PGN import (`POST /api/v1/games`) defaults to `analysis_status = pending`; an opt-in flag triggers immediate analysis (currently still auto-dispatches)
+- [x] New endpoint `POST /api/v1/games/{id}/analyse` — ownership-gated; dispatches `AnalyseGameJob` (commit 748bc51); BFF route at `/api/games/{id}/analyse`
+- [ ] `AnalyseGameJob` writes `analysing` on start and `analysed` (or `failed`) on completion (writes `running` / `complete` / `failed` today)
 
 Frontend
-- [ ] Games list: per-row analysis state badge + inline "Analyse this game" button for `pending` / `failed`
-- [ ] Games list: filter by analysis status; "Your chess accounts" header section with per-account Sync controls
+- [x] Games list: per-row analysis state badge + inline "Analyse this game" button for `pending` / `failed` with optimistic update (commit 748bc51)
+- [x] Games list: account filter pills; "Your accounts" header section with per-account Sync controls + last-synced + status (commit 748bc51)
 - [ ] Game detail page: works for `pending` games (board + metadata + Analyse CTA); coaching panels locked until `analysed`; retry control on `failed`
 - [ ] Polling / refresh while a game is `queued` / `analysing`
-- [ ] Reframe `/import` as **"Import PGN manually"** secondary path (CTA wording, copy, navigation prominence)
+- [x] Manual PGN repositioned as side-door in copy ("Or import a PGN manually (for over-the-board games)") — full CTA/page-title rename on `/import` still to land
 
 Tests / observability
 - [ ] Sync integration test: importing N games queues exactly the recent-subset-sized analysis fan-out

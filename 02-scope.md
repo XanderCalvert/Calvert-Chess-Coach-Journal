@@ -169,13 +169,19 @@ The staged pipeline maps cleanly to future monetisation. This is not an MVP feat
 
 ## Immediate Priority From Current Build State
 
-Given what is already implemented, focus next on:
+Recent shipped (commit 748bc51, May 2026):
 
-1. **Split sync from analysis** — sync should import metadata only and stop auto-queuing analysis for every imported game; auto-analyse only a small recent subset (target: 5)
-2. **On-demand analysis endpoint + UI** — `POST /api/games/{id}/analyse` plus an "Analyse this game" CTA on the games list and game page for any `pending` game
-3. **Game page works pre-analysis** — board replay, opening/result metadata, and "Analyse this game" CTA visible before engine analysis runs
-4. **Reposition manual PGN import as secondary** — rename the CTA to "Import PGN manually" / "Add one-off PGN"; the games list becomes the primary surface, not `/import`
-5. **Plain-English explanations + key-moment cards** in the game analysis experience
-6. **Heuristic mistake tagging** (MVP subset, conservative rules)
-7. **Notes + coach agreement** to complete the journal loop
-8. **Dedicated trends/dashboard pages** after explanation/tagging quality is solid
+- [x] **Sync split from analysis (backend):** `ImportExternalGameJob` no longer auto-dispatches `AnalyseGameJob`; `SyncChessComAccountJob` defers a `QueueRecentAnalysisJob` (delay 60s) that picks the most-recent N pending games per account (default `5`, `CHESS_AUTO_ANALYSE_ON_SYNC`).
+- [x] **On-demand analysis endpoint:** `POST /api/v1/games/{id}/analyse` (ownership-gated, returns 202) with BFF route at `/api/games/{id}/analyse`.
+- [x] **Games list "Analyse this game":** per-row analysis status badge plus an inline analyse button for `pending` / `failed` rows; optimistic update; account filter pills.
+- [x] **Manual PGN copy reframed:** games list empty-state now positions PGN paste as a side-door for over-the-board games.
+
+Focus next on:
+
+1. **Game page works pre-analysis** — board replay, opening/result metadata, and "Analyse this game" CTA visible before engine analysis runs (`pending`); locked coaching panels with placeholder; retry control on `failed`; polling while `queued` / `analysing`.
+2. **Migrate `analysis_status` enum** to `pending` / `queued` / `analysing` / `analysed` / `failed` and add `analysis_requested_at` (currently still `pending` / `running` / `complete` / `failed`).
+3. **Manual PGN import opt-in analyse toggle** — `POST /api/v1/games` for paste should default to `analysis_status = pending`; current behaviour still auto-dispatches `AnalyseGameJob`.
+4. **Plain-English explanations** on key moments (key-moment selection + UI is already done; explanations are the next layer).
+5. **Heuristic mistake tagging** (MVP subset, conservative rules).
+6. **Notes + coach agreement** to complete the journal loop.
+7. **Dedicated trends/dashboard pages** after explanation/tagging quality is solid.

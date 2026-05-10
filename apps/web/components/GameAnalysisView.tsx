@@ -293,6 +293,8 @@ interface Props {
   game: GameAnalysis
   initialPly?: number
   onPlyChange?: (ply: number) => void
+  onRequestAnalysis?: () => void
+  analyseError?: string | null
 }
 
 export default function GameAnalysisView(props: Props) {
@@ -303,7 +305,7 @@ export default function GameAnalysisView(props: Props) {
   )
 }
 
-function GameAnalysisViewInner({ game, initialPly, onPlyChange }: Props) {
+function GameAnalysisViewInner({ game, initialPly, onPlyChange, onRequestAnalysis, analyseError }: Props) {
   const moves = game.moves
   const resolvedOpeningName = resolveOpeningName(game.opening_name, game.eco_code)
   const hasKnownOpening = Boolean(resolvedOpeningName && resolvedOpeningName.toLowerCase() !== 'unknown')
@@ -532,15 +534,41 @@ function GameAnalysisViewInner({ game, initialPly, onPlyChange }: Props) {
       )}
 
       {/* Analysis status banners */}
-      {isPending && (
+      {game.analysis_status === 'pending' && (
+        <div className="mb-6 p-4 rounded text-sm flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" style={{ background: 'rgba(201,168,76,0.10)', border: '1px solid rgba(201,168,76,0.25)', color: 'var(--gold)' }}>
+          <span>This game has not been analysed yet.</span>
+          {onRequestAnalysis && (
+            <button
+              onClick={onRequestAnalysis}
+              style={{ ...btnBase, background: 'rgba(201,168,76,0.18)', color: 'var(--gold)', border: '1px solid rgba(201,168,76,0.45)', whiteSpace: 'nowrap' }}
+            >
+              Analyse this game
+            </button>
+          )}
+        </div>
+      )}
+      {game.analysis_status === 'running' && (
         <div className="mb-6 p-4 rounded text-sm flex items-center gap-3" style={{ background: 'rgba(201,168,76,0.10)', border: '1px solid rgba(201,168,76,0.25)', color: 'var(--gold)' }}>
           <span className="animate-pulse">●</span>
-          Analysis {game.analysis_status === 'running' ? 'in progress' : 'queued'} — results will appear automatically.
+          Analysis in progress — results will appear automatically.
         </div>
       )}
       {game.analysis_status === 'failed' && (
-        <div className="mb-6 p-4 rounded text-sm" style={{ background: 'rgba(220,60,60,0.10)', border: '1px solid rgba(220,60,60,0.3)', color: 'var(--red)' }}>
-          Analysis failed. You can re-import the game to try again.
+        <div className="mb-6 p-4 rounded text-sm flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" style={{ background: 'rgba(220,60,60,0.10)', border: '1px solid rgba(220,60,60,0.3)', color: 'var(--red)' }}>
+          <span>Analysis failed.</span>
+          {onRequestAnalysis && (
+            <button
+              onClick={onRequestAnalysis}
+              style={{ ...btnBase, background: 'rgba(220,60,60,0.12)', color: 'var(--red)', border: '1px solid rgba(220,60,60,0.40)', whiteSpace: 'nowrap' }}
+            >
+              Retry analysis
+            </button>
+          )}
+        </div>
+      )}
+      {analyseError && (
+        <div className="mb-4 p-3 rounded text-sm" style={{ background: 'rgba(220,60,60,0.08)', border: '1px solid rgba(220,60,60,0.25)', color: 'var(--red)' }}>
+          {analyseError}
         </div>
       )}
 
@@ -660,23 +688,34 @@ function GameAnalysisViewInner({ game, initialPly, onPlyChange }: Props) {
             )}
           </div>
 
-          <MoveDetailPanel
-            move={currentMove}
-            isBookMove={Boolean(currentMove && hasKnownOpening && currentMove.move_number <= openingBookPlyLimit)}
-            openingLabel={openingLabel}
-          />
-          <MoveExplorerPanel
-            fen={isExplorerMode ? currentFen : explorerBaseFen}
-            onTryMove={(newFen) => setExplorerFen(newFen)}
-          />
-          {game.analysis_status === 'complete' && (game.key_moments?.length ?? 0) > 0 && (
-            <KeyMomentsPanel
-              keyMoments={game.key_moments!}
-              onJumpToMove={(moveId) => {
-                const idx = moves.findIndex(m => m.id === moveId)
-                if (idx >= 0) goToMove(idx)
-              }}
-            />
+          {game.analysis_status === 'complete' ? (
+            <>
+              <MoveDetailPanel
+                move={currentMove}
+                isBookMove={Boolean(currentMove && hasKnownOpening && currentMove.move_number <= openingBookPlyLimit)}
+                openingLabel={openingLabel}
+              />
+              <MoveExplorerPanel
+                fen={isExplorerMode ? currentFen : explorerBaseFen}
+                onTryMove={(newFen) => setExplorerFen(newFen)}
+              />
+              {(game.key_moments?.length ?? 0) > 0 && (
+                <KeyMomentsPanel
+                  keyMoments={game.key_moments!}
+                  onJumpToMove={(moveId) => {
+                    const idx = moves.findIndex(m => m.id === moveId)
+                    if (idx >= 0) goToMove(idx)
+                  }}
+                />
+              )}
+            </>
+          ) : (
+            <div
+              className="rounded p-5 text-sm text-center"
+              style={{ background: 'var(--surface)', border: '1px solid rgba(232,224,208,0.10)', color: 'var(--text-muted)' }}
+            >
+              Analyse this game to unlock coaching insights — move evaluations, key moments, and position explorer.
+            </div>
           )}
         </div>
       </div>

@@ -133,6 +133,7 @@ class ConnectedAccountController extends Controller
                 'opponent_username' => $g->opponent_username,
                 'opponent_rating'  => $g->opponent_rating,
                 'user_rating_before' => $g->user_rating_before,
+                'user_colour'      => $g->user_colour?->value,
             ]),
             'meta' => [
                 'current_page' => $games->currentPage(),

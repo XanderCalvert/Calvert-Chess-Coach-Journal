@@ -34,6 +34,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/games', [GameController::class, 'index']);
         Route::post('/games', [GameController::class, 'store']);
         Route::get('/games/{id}', [GameController::class, 'show']);
+        Route::post('/games/{id}/analyse', [GameController::class, 'analyse']);
 
         Route::get('/connected-accounts', [ConnectedAccountController::class, 'index']);
         Route::post('/connected-accounts', [ConnectedAccountController::class, 'store']);

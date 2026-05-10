@@ -12,7 +12,12 @@ Generate coaching    (key moments, explanations, summary, trends — derived fro
 
 The legacy "import → immediately analyse every game with Stockfish" flow is deprecated. Analysing hundreds of historical games most users will never review wastes compute and slows the games list. Instead, sync should always feel instant, and analysis should feel like an intentional coaching action.
 
-**Status (May 2026):** PGN parse → persist moves → `AnalyseGameJob` (Stockfish, CP loss, classifications, game counters, `analysis_status`) is **live** but currently triggered for every imported/synced game. Migrating to the staged model below is a current priority. Key-moment persistence, tagging, LLM explanations, and post-game summary jobs described below are **not fully wired** to match this doc end-to-end; see [09-build-roadmap.md](./09-build-roadmap.md).
+**Status (May 2026):**
+
+- PGN parse → persist moves → `AnalyseGameJob` (Stockfish, CP loss, classifications, game counters, `analysis_status`) is **live**.
+- **Key-moment selection + persistence is live** (commit 33dd5bd): `AnalyseGameJob` picks top non-adjacent inaccuracy/mistake/blunder plies (cap 3, ranked), assigns phase + mistake tag, writes `KeyMoment` rows with `explanation_status = not_requested`; surfaced via API and rendered in `KeyMomentsPanel` on `/g/{share_code}`.
+- **Sync vs analysis split is live on the backend** (commit 748bc51): `ImportExternalGameJob` no longer auto-dispatches `AnalyseGameJob`; `SyncChessComAccountJob` defers a `QueueRecentAnalysisJob` (60s delay) which dispatches analysis for the most-recent N pending games per account (default `5`, configurable via `CHESS_AUTO_ANALYSE_ON_SYNC`). New `POST /api/v1/games/{id}/analyse` endpoint plus the BFF route at `/api/games/{id}/analyse` powers on-demand analysis from the games list.
+- **Still outstanding** vs the doc below: `analysis_status` enum rename (`queued` / `analysing` / `analysed`), `analysis_requested_at` column, `pending`-aware game detail page, manual PGN import opt-in analyse toggle, LLM explanation generation, and post-game summary / trend-update jobs. See [09-build-roadmap.md](./09-build-roadmap.md) Phase 3.5.
 
 ---
 

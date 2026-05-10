@@ -113,7 +113,6 @@ class ImportExternalGameJob implements ShouldQueue
             return $game;
         });
 
-        AnalyseGameJob::dispatch($game->id)->afterCommit();
     }
 
     public function failed(Throwable $e): void

@@ -28,6 +28,8 @@ interface GameSummary {
   blunder_count: number | null
   mistake_count: number | null
   inaccuracy_count: number | null
+  user_colour: 'white' | 'black' | null
+  opponent_username: string | null
 }
 
 const PLATFORM_LABEL: Record<string, string> = {
@@ -35,11 +37,15 @@ const PLATFORM_LABEL: Record<string, string> = {
   lichess: 'Lichess',
 }
 
-const RESULT_LABEL: Record<string, string> = {
-  white: '1-0',
-  black: '0-1',
-  draw: '½-½',
-  unknown: '—',
+function userResultLabel(result: string, userColour: 'white' | 'black' | null): { label: string; color: string } {
+  if (!userColour) {
+    const raw = { white: '1-0', black: '0-1', draw: '½-½', unknown: '—' }
+    return { label: raw[result as keyof typeof raw] ?? '—', color: 'var(--text-faint)' }
+  }
+  if (result === 'draw') return { label: 'Draw', color: 'var(--text-muted)' }
+  if (result === userColour) return { label: 'Win', color: '#4ade80' }
+  if (result === 'unknown') return { label: '—', color: 'var(--text-faint)' }
+  return { label: 'Loss', color: '#f87171' }
 }
 
 const STATUS_STYLES: Record<string, { label: string; color: string }> = {
@@ -59,6 +65,7 @@ export default function GamesPage() {
   const [filterAccountId, setFilterAccountId] = useState<string | null>(null)
   const [syncingIds, setSyncingIds] = useState<Set<string>>(new Set())
   const [syncMessages, setSyncMessages] = useState<Record<string, string>>({})
+  const [analysingIds, setAnalysingIds] = useState<Set<string>>(new Set())
   const [page, setPage] = useState(1)
 
   useEffect(() => {
@@ -112,6 +119,22 @@ export default function GamesPage() {
     } catch {
       setSyncMessages(prev => ({ ...prev, [account.id]: 'Could not reach server.' }))
       setSyncingIds(prev => { const s = new Set(prev); s.delete(account.id); return s })
+    }
+  }
+
+  async function handleAnalyse(gameId: string) {
+    setAnalysingIds(prev => new Set(prev).add(gameId))
+    setGames(prev => prev.map(g => g.id === gameId ? { ...g, analysis_status: 'running' } : g))
+    try {
+      const res = await fetch(`/api/games/${gameId}/analyse`, { method: 'POST' })
+      if (res.status !== 202 && res.status !== 409) {
+        // revert optimistic update on unexpected error
+        setGames(prev => prev.map(g => g.id === gameId ? { ...g, analysis_status: 'pending' } : g))
+      }
+    } catch {
+      setGames(prev => prev.map(g => g.id === gameId ? { ...g, analysis_status: 'pending' } : g))
+    } finally {
+      setAnalysingIds(prev => { const s = new Set(prev); s.delete(gameId); return s })
     }
   }
 
@@ -193,12 +216,21 @@ export default function GamesPage() {
               >
                 My Games
               </h1>
-              {!loading && !error && (
-                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                  {filteredGames.length} {filteredGames.length === 1 ? 'game' : 'games'}
-                  {filterAccountId && ' for this account'}
-                </p>
-              )}
+              {!loading && !error && (() => {
+                const analysedCount = filteredGames.filter(g => g.analysis_status === 'complete').length
+                const total = filteredGames.length
+                return (
+                  <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                    {total} {total === 1 ? 'game' : 'games'}
+                    {filterAccountId && ' for this account'}
+                    {total > 0 && (
+                      <span style={{ color: 'var(--text-faint)' }}>
+                        {' · '}{analysedCount} of {total} analysed
+                      </span>
+                    )}
+                  </p>
+                )
+              })()}
             </div>
 
             {/* Account filter */}
@@ -303,6 +335,7 @@ export default function GamesPage() {
                   <tbody>
                     {pageGames.map((g, i) => {
                       const status = STATUS_STYLES[g.analysis_status] ?? STATUS_STYLES.pending
+                      const canAnalyse = g.analysis_status === 'pending' || g.analysis_status === 'failed'
                       return (
                         <tr
                           key={g.id}
@@ -311,11 +344,28 @@ export default function GamesPage() {
                           }}
                         >
                           <td className="px-4 py-3">
-                            <span style={{ color: 'var(--text)' }}>{g.white_player}</span>
-                            <span className="mx-1.5" style={{ color: 'var(--text-faint)' }}>
-                              {RESULT_LABEL[g.result] ?? '—'}
-                            </span>
-                            <span style={{ color: 'var(--text)' }}>{g.black_player}</span>
+                            {(() => {
+                              const opponent = g.opponent_username ?? (g.user_colour === 'white' ? g.black_player : g.white_player)
+                              const { label, color } = userResultLabel(g.result, g.user_colour)
+                              return (
+                                <div className="flex items-center gap-2">
+                                  <span
+                                    title={g.user_colour === 'white' ? 'Playing White' : 'Playing Black'}
+                                    style={{
+                                      display: 'inline-block',
+                                      width: 10,
+                                      height: 10,
+                                      borderRadius: 2,
+                                      flexShrink: 0,
+                                      background: g.user_colour === 'white' ? '#f0ead6' : '#1a1a1a',
+                                      border: '1px solid rgba(232,224,208,0.30)',
+                                    }}
+                                  />
+                                  <span style={{ color: 'var(--text)' }}>vs {opponent}</span>
+                                  <span className="text-xs font-medium" style={{ color }}>{label}</span>
+                                </div>
+                              )
+                            })()}
                           </td>
                           <td className="px-4 py-3" style={{ color: 'var(--text-muted)', maxWidth: '180px' }}>
                             <span className="block truncate">
@@ -343,10 +393,27 @@ export default function GamesPage() {
                             className="px-4 py-3 font-medium"
                             style={{ color: 'var(--gold)', fontFamily: 'var(--font-dm-mono)' }}
                           >
-                            {g.accuracy_pct != null ? `${g.accuracy_pct}%` : '—'}
+                            {g.analysis_status === 'complete' && g.accuracy_pct != null ? `${g.accuracy_pct}%` : '—'}
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
-                            <span className="text-xs" style={{ color: status.color }}>{status.label}</span>
+                            {canAnalyse ? (
+                              <button
+                                onClick={() => handleAnalyse(g.id)}
+                                disabled={analysingIds.has(g.id)}
+                                className="text-xs px-3 py-1 rounded"
+                                style={{
+                                  color: 'var(--gold)',
+                                  border: '1px solid rgba(201,168,76,0.35)',
+                                  background: 'rgba(201,168,76,0.08)',
+                                  cursor: analysingIds.has(g.id) ? 'not-allowed' : 'pointer',
+                                  opacity: analysingIds.has(g.id) ? 0.6 : 1,
+                                }}
+                              >
+                                Analyse
+                              </button>
+                            ) : (
+                              <span className="text-xs" style={{ color: status.color }}>{status.label}</span>
+                            )}
                           </td>
                           <td className="px-4 py-3 text-right">
                             <Link

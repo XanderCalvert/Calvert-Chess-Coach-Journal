@@ -1,11 +1,28 @@
 'use client'
 
 import Link from 'next/link'
+import { useEffect, useState } from 'react'
 import { useAuth } from '@/lib/auth-context'
 import NavSignOut from './NavSignOut'
 
+function useFirstChessUsername(enabled: boolean): string | null {
+  const [username, setUsername] = useState<string | null>(null)
+  useEffect(() => {
+    if (!enabled) return
+    fetch('/api/connected-accounts')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        const first = d?.data?.[0]?.username ?? null
+        setUsername(first)
+      })
+      .catch(() => {})
+  }, [enabled])
+  return username
+}
+
 export default function Nav() {
   const { user } = useAuth()
+  const chessUsername = useFirstChessUsername(!!user)
 
   return (
     <nav
@@ -34,6 +51,13 @@ export default function Nav() {
                 My Games
               </Link>
             </li>
+            {chessUsername && (
+              <li>
+                <Link href={`/u/${chessUsername}`} className="nav-link text-[13px] tracking-[0.03em] no-underline">
+                  My Profile
+                </Link>
+              </li>
+            )}
             <li>
               <Link href="/settings" className="nav-link text-[13px] tracking-[0.03em] no-underline">
                 Settings

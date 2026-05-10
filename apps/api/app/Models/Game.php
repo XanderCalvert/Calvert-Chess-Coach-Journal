@@ -64,7 +64,10 @@ class Game extends Model
 
     public function scopeForUser(Builder $query, string $userId): Builder
     {
-        return $query->where('user_id', $userId);
+        return $query->where(function (Builder $q) use ($userId) {
+            $q->where('user_id', $userId)
+              ->orWhereHas('connectedAccount', fn (Builder $ca) => $ca->where('user_id', $userId));
+        });
     }
 
     public function user(): BelongsTo

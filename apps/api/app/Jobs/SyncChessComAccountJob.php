@@ -112,6 +112,9 @@ class SyncChessComAccountJob implements ShouldQueue
             'sync_status'    => SyncStatus::Synced->value,
             'last_synced_at' => now(),
         ]);
+
+        QueueRecentAnalysisJob::dispatch($this->connectedAccountId)
+            ->delay(now()->addSeconds(60));
     }
 
     public function failed(Throwable $e): void

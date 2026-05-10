@@ -358,19 +358,23 @@ Stage C — Coach (derived from analysed games)
 - [x] PGN import (`/import`, API `POST /api/v1/games`)
 - [x] Stockfish analysis jobs; classifications; move-level data
 - [x] Game analysis experience: `/g/{share_code}`, `?ply=N`, board + move list + move detail
-- [x] Games list `/games`
+- [x] Games list `/games` — now includes "Your accounts" header with per-account sync, per-row analysis status badge, account filter, inline "Analyse this game" for `pending` / `failed`, pagination
 - [x] **Public share path:** `/g/{code}` (short **share_code**); *this doc’s `/share/{slug}-{id}` pattern is not the implemented contract*
 - [x] **Chess.com profile:** `/u/{username}` — connected account, sync, imported games, analysis trends, game-type filter
 - [x] Operator CLI: `chess:sync-connected-account` (see [ADMIN-GUIDE.md](./ADMIN-GUIDE.md))
+- [x] **Auth + onboarding:** `/register`, `/login`, `/onboarding`, `/settings`, Sanctum tokens, `chess_token` cookie, ownership-gated queries (commit c57641d)
+- [x] **Key moments rendered on `/g/{share_code}`:** `KeyMomentsPanel` with ranked moments, played-vs-best, jump-to-position (commit 33dd5bd)
+- [x] **Staged sync vs analyse pipeline (backend):** `ImportExternalGameJob` imports as `pending`; `QueueRecentAnalysisJob` queues only the most-recent N pending games per sync (default 5, env `CHESS_AUTO_ANALYSE_ON_SYNC`); `POST /api/v1/games/{id}/analyse` for on-demand analysis (commit 748bc51)
 
 ### Still open (vs this doc)
 - [ ] Homepage polish as specified (hero, example analysis)
 - [ ] `/games/[id]` as canonical ID route in nav (UUID route exists under `/games/.../analysis`)
 - [ ] `/games/[id]/review` training mode
 - [ ] `/patterns` pattern tracking page
-- [ ] `/profile` settings (explanation depth, linked accounts UI beyond profile page)
 - [ ] `/about` build page
 - [ ] Lichess integration
+- [ ] `/games/[id]` and `/g/{share_code}` rendering for `pending` games (board + metadata + Analyse CTA + locked coaching panels); polling while `queued` / `analysing`; retry on `failed`
+- [ ] `/import` page rename + opt-in analyse toggle (currently still auto-dispatches `AnalyseGameJob` on submit)
 
 ---
 

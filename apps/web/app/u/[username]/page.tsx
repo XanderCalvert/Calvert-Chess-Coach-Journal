@@ -30,6 +30,7 @@ interface ProfileGame {
   opening_name: string
   move_count: number
   analysis_status: 'pending' | 'running' | 'complete' | 'failed'
+  accuracy_pct: string | null
   blunder_count: number | null
   mistake_count: number | null
   inaccuracy_count: number | null
@@ -37,6 +38,7 @@ interface ProfileGame {
   opponent_username: string | null
   opponent_rating: number | null
   user_rating_before: number | null
+  user_colour: 'white' | 'black' | null
 }
 
 interface GamesMeta {
@@ -100,11 +102,15 @@ interface ProfileStats {
   recommended_game_type?: string | null
 }
 
-const RESULT_LABEL: Record<string, string> = {
-  white: '1-0',
-  black: '0-1',
-  draw: '½-½',
-  unknown: '—',
+function userResultLabel(result: string, userColour: 'white' | 'black' | null): { label: string; color: string } {
+  if (!userColour) {
+    const raw: Record<string, string> = { white: '1-0', black: '0-1', draw: '½-½', unknown: '—' }
+    return { label: raw[result] ?? '—', color: 'var(--text-faint)' }
+  }
+  if (result === 'draw') return { label: 'Draw', color: 'var(--text-muted)' }
+  if (result === userColour) return { label: 'Win', color: '#4ade80' }
+  if (result === 'unknown') return { label: '—', color: 'var(--text-faint)' }
+  return { label: 'Loss', color: '#f87171' }
 }
 
 const PLAYER_RESULT_COLOUR: Record<string, string> = {
@@ -858,7 +864,7 @@ export default function ProfilePage() {
                 <table className="w-full text-sm" style={{ borderCollapse: 'collapse' }}>
                   <thead>
                     <tr style={{ background: 'var(--surface)', borderBottom: '1px solid rgba(232,224,208,0.10)' }}>
-                      {['Result', 'Opponent', 'Time control', 'Blunders', 'Status', ''].map(h => (
+                      {['Player', 'Opening', 'Date', 'Moves', 'Accuracy', 'Status', ''].map(h => (
                         <th
                           key={h}
                           className="text-left px-4 py-3 text-xs uppercase tracking-wider"
@@ -872,27 +878,49 @@ export default function ProfilePage() {
                   <tbody>
                     {games.map((g, i) => {
                       const status = STATUS_STYLES[g.analysis_status] ?? STATUS_STYLES.pending
+                      const opponent = g.opponent_username ?? (g.user_colour === 'white' ? g.black_player : g.white_player)
+                      const { label: resultLabel, color: resultColor } = userResultLabel(g.result, g.user_colour)
                       return (
                         <tr
                           key={g.id}
                           style={{ borderBottom: i < games.length - 1 ? '1px solid rgba(232,224,208,0.06)' : undefined }}
                         >
-                          <td className="px-4 py-3 font-medium" style={{ color: 'var(--text)', fontFamily: 'var(--font-dm-mono)' }}>
-                            {RESULT_LABEL[g.result] ?? '—'}
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <span
+                                title={g.user_colour === 'white' ? 'Playing White' : 'Playing Black'}
+                                style={{
+                                  display: 'inline-block',
+                                  width: 10,
+                                  height: 10,
+                                  borderRadius: 2,
+                                  flexShrink: 0,
+                                  background: g.user_colour === 'white' ? '#f0ead6' : '#1a1a1a',
+                                  border: '1px solid rgba(232,224,208,0.30)',
+                                }}
+                              />
+                              <span style={{ color: 'var(--text)' }}>vs {opponent}</span>
+                              <span className="text-xs font-medium" style={{ color: resultColor }}>{resultLabel}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3" style={{ color: 'var(--text-muted)', maxWidth: '160px' }}>
+                            <span className="block truncate">
+                              {g.opening_name || '—'}
+                              {g.eco_code && (
+                                <span className="ml-1.5" style={{ color: 'var(--text-faint)', fontFamily: 'var(--font-dm-mono)', fontSize: '11px' }}>
+                                  {g.eco_code}
+                                </span>
+                              )}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-dm-mono)', fontSize: '12px' }}>
+                            {g.played_at ?? '—'}
                           </td>
                           <td className="px-4 py-3" style={{ color: 'var(--text-muted)' }}>
-                            {g.opponent_username ?? '—'}
-                            {g.opponent_rating != null && (
-                              <span className="ml-1.5" style={{ color: 'var(--text-faint)', fontSize: '11px', fontFamily: 'var(--font-dm-mono)' }}>
-                                ({g.opponent_rating})
-                              </span>
-                            )}
+                            {g.move_count}
                           </td>
-                          <td className="px-4 py-3" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-dm-mono)', fontSize: '12px' }}>
-                            {g.time_control ?? '—'}
-                          </td>
-                          <td className="px-4 py-3 font-medium" style={{ color: g.blunder_count != null && g.blunder_count > 0 ? '#f87171' : 'var(--text-muted)', fontFamily: 'var(--font-dm-mono)' }}>
-                            {g.blunder_count ?? (g.analysis_status === 'complete' ? '0' : '—')}
+                          <td className="px-4 py-3 font-medium" style={{ color: 'var(--gold)', fontFamily: 'var(--font-dm-mono)' }}>
+                            {g.analysis_status === 'complete' && g.accuracy_pct != null ? `${g.accuracy_pct}%` : '—'}
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
                             <span className="text-xs" style={{ color: status.color }}>{status.label}</span>
@@ -900,7 +928,7 @@ export default function ProfilePage() {
                           <td className="px-4 py-3 text-right">
                             {g.share_code && (
                               <Link
-                                href={`/g/${g.share_code}`}
+                                href={g.share_code ? `/g/${g.share_code}` : `/games/${g.id}/analysis`}
                                 className="text-xs px-3 py-1 rounded"
                                 style={{ color: 'var(--gold)', border: '1px solid rgba(201,168,76,0.3)' }}
                               >

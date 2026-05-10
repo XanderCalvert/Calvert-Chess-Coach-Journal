@@ -45,7 +45,7 @@ export default function KeyMomentsPanel({ keyMoments, onJumpToMove }: KeyMoments
             className="rounded p-4 flex flex-col gap-3"
             style={{ background: 'var(--surface)', border: '1px solid rgba(232,224,208,0.10)' }}
           >
-            {/* Top row: rank + phase + classification */}
+            {/* Top row: rank + colour pip + phase + classification */}
             <div className="flex items-center gap-2 flex-wrap">
               <span
                 className="text-xs font-semibold px-2 py-0.5 rounded"
@@ -53,6 +53,18 @@ export default function KeyMomentsPanel({ keyMoments, onJumpToMove }: KeyMoments
               >
                 #{km.rank}
               </span>
+              <span
+                title={km.colour === 'white' ? 'White' : 'Black'}
+                style={{
+                  display: 'inline-block',
+                  width: 12,
+                  height: 12,
+                  borderRadius: 2,
+                  background: km.colour === 'white' ? '#f0ead6' : '#1a1a1a',
+                  border: '1px solid rgba(232,224,208,0.30)',
+                  flexShrink: 0,
+                }}
+              />
               <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
                 {PHASE_LABEL[km.game_phase] ?? km.game_phase}
               </span>

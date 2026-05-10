@@ -39,6 +39,8 @@ class GameController extends Controller
                 'blunder_count'        => $g->blunder_count,
                 'mistake_count'        => $g->mistake_count,
                 'inaccuracy_count'     => $g->inaccuracy_count,
+                'user_colour'          => $g->user_colour?->value,
+                'opponent_username'    => $g->opponent_username,
                 'share_code'           => $g->share_code,
             ]);
 
@@ -65,6 +67,21 @@ class GameController extends Controller
             ->firstOrFail();
 
         return response()->json($this->formatGameResponse($game));
+    }
+
+    public function analyse(string $id): JsonResponse
+    {
+        $game = Game::forUser(auth()->id())->findOrFail($id);
+
+        if ($game->analysis_status === AnalysisStatus::Running || $game->analysis_status === AnalysisStatus::Complete) {
+            return response()->json(['message' => 'Analysis already in progress or complete.'], 409);
+        }
+
+        $game->update(['analysis_status' => AnalysisStatus::Running]);
+
+        AnalyseGameJob::dispatch($game->id)->afterCommit();
+
+        return response()->json(['message' => 'Analysis queued.'], 202);
     }
 
     public function store(Request $request): JsonResponse

@@ -1,6 +1,6 @@
 # Chess Coach Journal — Product Overview
 
-**Build status (May 2026):** The **evaluate + replay + share** loop and **Chess.com profile imports** are in the codebase. **Auth and onboarding** are now complete — registration, login, onboarding gate (connect account before dashboard), settings page, and full user-scoped queries. **explain** (LLM) and **club notes** pillars are still largely ahead. See [00-index.md](./00-index.md).
+**Build status (May 2026):** The **evaluate + replay + share** loop and **Chess.com profile imports** are in the codebase. **Auth and onboarding** are complete — registration, login, onboarding gate (connect account before dashboard), settings page, and full user-scoped queries. **Key moments** are now selected, persisted, and rendered on `/g/{share_code}`. The **staged sync / analyse pipeline** is wired on the backend (sync imports metadata only; only the most-recent ~5 games per sync auto-analyse; on-demand `POST /api/v1/games/{id}/analyse` from the games list). **explain** (LLM), **club notes**, and the `pending`-aware game detail page are still ahead. See [00-index.md](./00-index.md).
 
 ## App Name
 Chess Coach Journal

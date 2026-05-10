@@ -9,13 +9,13 @@ Rough mapping to this doc:
 | Registration | `/register` — name, email, password; redirects to `/onboarding` on first register |
 | Login | `/login` — email/password; redirects to `/onboarding` if no accounts linked, else `/games` |
 | Onboarding | `/onboarding` — required step: connect Chess.com or Lichess account before dashboard |
-| Manual PGN Import | `/import` — paste flow; **secondary** path. Should be reframed as "Import PGN manually" once the staged pipeline lands |
-| Game List | `/games` — primary post-onboarding surface. Should grow into "Your chess accounts" + "Recent games" with per-row analysis state and inline "Analyse this game" CTA |
-| Game Detail / Replay | `/g/{share_code}` (primary); `/games/{id}/analysis` still available. Currently assumes analysis exists — needs a `pending`-aware variant once sync stops auto-analysing every game |
-| Settings | `/settings` — profile (name, email) + "Your chess accounts" (add/remove linked accounts) |
+| Manual PGN Import | `/import` — paste flow; **secondary** path. Games list empty-state now positions it as "Or import a PGN manually (for over-the-board games)". CTA wording on the import page itself + opt-in analyse toggle still to land. |
+| Game List | `/games` — primary post-onboarding surface. Now shows: "Your accounts" header with per-account Sync button + last-synced + status; per-row analysis status badge; account filter pills; inline "Analyse this game" button for `pending` / `failed` rows (calls `POST /api/games/{id}/analyse`); pagination. |
+| Game Detail / Replay | `/g/{share_code}` (primary); `/games/{id}/analysis` still available. **Currently still assumes analysis exists** — `pending`-aware variant (board + metadata + analyse CTA, locked coaching, `failed` retry) is the next gap to close now that sync no longer auto-analyses every game. |
+| Settings | `/settings` — profile (name, email, copy account UUID, sign out) + "Your chess accounts" (add/remove linked accounts; cross-user uniqueness collisions return 409) |
 | Dashboard | Not a dedicated page yet |
 | Trends | Not `/patterns`; **profile** `/u/{username}` shows aggregate trends for a linked Chess.com account |
-| Key moment cards / explanations | Board + move detail; LLM explanation cards not wired |
+| Key moment cards | **Wired** via `KeyMomentsPanel` on `/g/{share_code}` — top 3 ranked moments with played-vs-best context, jump-to-position, and tag badge. LLM explanation text is the next layer. |
 
 Layout: **Nav** component drives top/side navigation (not necessarily a 220px left sidebar as specified below). Settings link is in Nav.
 

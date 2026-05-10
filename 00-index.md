@@ -37,13 +37,25 @@ Use [09-build-roadmap.md](./09-build-roadmap.md) for detailed checkboxes. Summar
 - [x] Stockfish via queued `AnalyseGameJob`; per-move CP loss; blunder / mistake / inaccuracy counts
 - [x] Interactive analysis UI: board, move list, keyboard nav, move detail, `?ply=N` deep links
 - [x] Public game URLs: `/g/{share_code}` (8-char codes); BFF routes under `/api/...`
-- [x] Games list and import flow (`/games`, `/import`)
+- [x] Games list and import flow (`/games`, `/import`); games list now includes per-row analysis status badges, account filter, and inline "Analyse" CTA for `pending` / `failed`
 - [x] **Chess.com–linked profiles:** `connected_accounts`, `/u/{username}`, sync (recent window in UI), stats + sparklines, game-type filter, deduped imports
 - [x] **CLI:** `chess:sync-connected-account` for full-archive or recent-window sync ([ADMIN-GUIDE.md](./ADMIN-GUIDE.md))
+- [x] **Auth + onboarding:** Sanctum personal access tokens + `chess_token` httpOnly cookie; `/register`, `/login`, `/onboarding`, `/settings`; onboarding gate (must connect a chess account before dashboard); ownership-scoped `Game` / `ConnectedAccount` queries; `ClaimDevData` artisan command
+- [x] **Key moments end-to-end:** `AnalyseGameJob` now selects top non-adjacent inaccuracy/mistake/blunder plies (cap 3, ranked, with phase + tag + `explanation_status = not_requested`); persisted to `key_moments`; surfaced via `GameController` payload and rendered in `KeyMomentsPanel` on `/g/{share_code}`
+- [x] **Staged sync / analyse pipeline (commit 748bc51):**
+  - `ImportExternalGameJob` no longer auto-dispatches `AnalyseGameJob` — every imported game starts as `analysis_status = pending`
+  - New `QueueRecentAnalysisJob` runs after `SyncChessComAccountJob` and dispatches `AnalyseGameJob` only for the most-recent N pending games per account (default `5`, configurable via `CHESS_AUTO_ANALYSE_ON_SYNC`)
+  - New `POST /api/v1/games/{id}/analyse` endpoint (ownership-gated, dispatches `AnalyseGameJob`); BFF route at `/api/games/{id}/analyse`
+  - Games list shows per-row analysis state with optimistic "Analyse this game" action for `pending` / `failed`
+  - Manual PGN repositioned in copy as the side-door ("Or import a PGN manually (for over-the-board games)")
+  - Connected-account `store` returns 409 on cross-user uniqueness collision
 
 **Not done yet (MVP gaps)**
 
-- [ ] Auth (register/login, user-owned games)
+- [ ] `analysis_status` enum migration to `pending` / `queued` / `analysing` / `analysed` / `failed` (current code still uses `pending` / `running` / `complete` / `failed`)
+- [ ] `analysis_requested_at` column
+- [ ] Game detail page rendering for `pending` games (currently assumes analysis exists; needs locked coaching panels + retry on `failed`)
+- [ ] Manual PGN import opt-in analyse toggle (currently still auto-dispatches `AnalyseGameJob` on submit)
 - [ ] LLM plain-English explanations on key moments; caching
 - [ ] Heuristic mistake tags + user override in product UI
 - [ ] Dedicated trends `/patterns` or dashboard as in [08-ui-structure.md](./08-ui-structure.md) (profile has **aggregate** trends only)
@@ -56,12 +68,11 @@ Use [09-build-roadmap.md](./09-build-roadmap.md) for detailed checkboxes. Summar
 
 Current priority order (short version):
 
-1. **Split sync from analysis (staged pipeline)** — sync imports metadata only; auto-analyse only the recent subset (MVP: 5 most-recent newly imported); add `POST /api/v1/games/{id}/analyse`; new `analysis_status` enum (`pending` / `queued` / `analysing` / `analysed` / `failed`)
-2. **Game list + game page work for `pending` games** — inline "Analyse this game", coaching panels locked until `analysed`, retry on `failed`; reframe `/import` as "Import PGN manually"
-3. **Key moments + LLM explanations in product UI** (`/g/{share_code}`)
-4. **Heuristic mistake tags** (small conservative subset first)
-5. **Notes + coaching/journal loop**
-6. **Dedicated dashboard/trends pages**, then Lichess and polish
+1. **Finish the staged-pipeline UX** — game detail page must render for `pending` games (board + metadata + "Analyse this game" CTA, coaching panels locked, retry on `failed`); migrate `analysis_status` enum to `pending` / `queued` / `analysing` / `analysed` / `failed` and add `analysis_requested_at`; manual PGN import opt-in analyse toggle
+2. **Key moments + LLM explanations** in `/g/{share_code}` (key-moment selection + persistence + UI is now done; explanations are next)
+3. **Heuristic mistake tags** (small conservative subset first)
+4. **Notes + coaching/journal loop**
+5. **Dedicated dashboard/trends pages**, then Lichess and polish
 
 See details in [09-build-roadmap.md](./09-build-roadmap.md) (Phase 3.5), [05-analysis-pipeline.md](./05-analysis-pipeline.md) (staged pipeline), [03-architecture.md](./03-architecture.md), and [11-profile-plan.md](./11-profile-plan.md).
 

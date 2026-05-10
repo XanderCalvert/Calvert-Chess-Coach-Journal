@@ -17,6 +17,7 @@ export default function AnalysisPage() {
   const [game, setGame]   = useState<GameAnalysis | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [polling, setPolling] = useState(false)
+  const [analyseError, setAnalyseError] = useState<string | null>(null)
 
   const gameRef = useRef<GameAnalysis | null>(null)
   const errorRef = useRef<string | null>(null)
@@ -78,6 +79,21 @@ export default function AnalysisPage() {
     return () => clearInterval(interval)
   }, [polling, id])
 
+  const handleRequestAnalysis = useCallback(async () => {
+    setAnalyseError(null)
+    const res = await fetch(`/api/games/${id}/analyse`, { method: 'POST' })
+    if (res.status === 202) {
+      setGame(prev => prev ? { ...prev, analysis_status: 'running' } : prev)
+      setPolling(true)
+    } else if (res.status === 409) {
+      // already running or complete — start polling to pick up the result
+      setPolling(true)
+    } else {
+      const d = await res.json().catch(() => null)
+      setAnalyseError(d?.message ?? 'Failed to queue analysis. Please try again.')
+    }
+  }, [id])
+
   const handlePlyChange = useCallback((ply: number) => {
     const currentRaw = parseInt(searchParams.get('ply') ?? '', 10)
     const currentPly = isNaN(currentRaw) || currentRaw < 0 ? 0 : currentRaw
@@ -111,6 +127,8 @@ export default function AnalysisPage() {
             game={game}
             initialPly={initialPly}
             onPlyChange={handlePlyChange}
+            onRequestAnalysis={handleRequestAnalysis}
+            analyseError={analyseError}
           />
         )}
       </main>

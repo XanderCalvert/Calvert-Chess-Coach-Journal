@@ -226,7 +226,10 @@ Note: previous values (`running`, `complete`) are superseded by `analysing` and 
 
 - [x] Schema + models for games, moves, engine analyses, key moments (table), mistake tags (seeded), manual notes, trend summaries (table)
 - [x] Connected accounts + Chess.com import metadata on games
-- [ ] `analysis_status` enum migrated to `pending` / `queued` / `analysing` / `analysed` / `failed`
-- [ ] `analysis_requested_at` column added; sync no longer auto-queues analysis for every imported game (only the recent subset)
-- [ ] Key moments + explanations populated end-to-end in UI for every analysed game
+- [x] **Personal access tokens** (Sanctum) — `personal_access_tokens` migration + Sanctum config wired (commit c57641d)
+- [x] **Key moments populated** during analysis: `AnalyseGameJob` selects top non-adjacent inaccuracy/mistake/blunder plies (cap 3, ranked, with phase + tag) and writes `KeyMoment` rows with `explanation_status = not_requested`; `key_moments.mistake_tag_id` is now nullable (commit 33dd5bd)
+- [x] **Sync no longer auto-queues analysis for every imported game** — `ImportExternalGameJob` writes `analysis_status = pending` only; `QueueRecentAnalysisJob` runs the recent-subset rule (commit 748bc51)
+- [ ] `analysis_status` enum migrated to `pending` / `queued` / `analysing` / `analysed` / `failed` (still `pending` / `running` / `complete` / `failed` in code)
+- [ ] `analysis_requested_at` column added
+- [ ] Key-moment **explanation text** populated end-to-end in UI (LLM step still outstanding; selection + persistence + render are done)
 - [ ] Trend summary rows driven by product “trends” page (profile uses **query-time** stats instead)

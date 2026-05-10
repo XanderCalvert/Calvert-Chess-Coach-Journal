@@ -380,7 +380,7 @@ connected account + Chess.com game uuid (stored as external_id on games)
 - [x] App imports recent games without duplicate records
 - [x] Sync can be re-run safely
 - [x] Profile page shows updated game count after sync
-- [ ] **Updated:** sync no longer queues `AnalyseGameJob` for every imported game; only the recent auto-analyse subset (MVP: 5 most-recent newly imported) is auto-queued. All other games are `analysis_status = pending` until the user triggers analysis via `POST /api/v1/games/{id}/analyse`.
+- [x] **Sync no longer queues `AnalyseGameJob` for every imported game** — `ImportExternalGameJob` writes `analysis_status = pending` only; `QueueRecentAnalysisJob` (60s after `SyncChessComAccountJob`) dispatches analysis for the **most-recent N pending games per account** (default `5`, env `CHESS_AUTO_ANALYSE_ON_SYNC`). All other games stay `pending` until the user triggers `POST /api/v1/games/{id}/analyse` from the games list (commit 748bc51).
 
 ---
 
@@ -646,17 +646,19 @@ This week:
 
 ### Next up
 
-1. **Close the explain loop on game pages**
-   - Key-moment cards in `/g/{share_code}` with played-vs-best and explanation text.
-   - Cached deterministic LLM explanations per key moment.
-2. **Add first heuristic tags**
+1. **Close the staged-pipeline UX loop**
+   - `pending`-aware game detail page (board + metadata + Analyse CTA + locked coaching panels; polling while `queued` / `analysing`; retry on `failed`).
+   - Migrate `analysis_status` enum → `pending` / `queued` / `analysing` / `analysed` / `failed`; add `analysis_requested_at`.
+   - Manual PGN import opt-in analyse toggle.
+2. **Close the explain loop on game pages**
+   - Key-moment **selection + persistence + ranked rendering is done** (commit 33dd5bd).
+   - Next: cached deterministic LLM explanation text per key moment.
+3. **Add first heuristic tags**
    - Conservative rules for a small tag subset; show tag badges in analysis/profile surfaces.
-3. **Add auth + ownership**
-   - User login/session and profile claim/ownership model for connected accounts and games.
 4. **Promote trends into dedicated views**
    - Move beyond profile-only aggregates to dashboard/`/patterns` style pages.
 5. **Expand imports**
-   - Lichess sync after Chess.com flow and ownership model are stable.
+   - Lichess sync now that Chess.com flow + ownership model are stable.
 6. **Then coaching layers**
    - Focus areas + coaching summary (Phase 6) once tagging data is reliable.
 
