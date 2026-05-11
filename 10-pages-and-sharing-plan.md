@@ -12,6 +12,12 @@ A chess improvement platform focused on:
 
 The emphasis is educational feedback rather than raw engine lines.
 
+Recruiter-facing positioning for this surface:
+
+> Built as a full-stack case study in asynchronous analysis systems, deterministic coaching signals, and product-grade UX for explainable chess improvement.
+
+Chess is the application domain; the portfolio signal is the engineering and product decisions exposed through the UI.
+
 ---
 
 ## Core User Flow
@@ -38,6 +44,24 @@ User keeps syncing regularly
 
 Manual PGN paste remains as a **secondary** "Import PGN manually" path (OTB games, club games, training positions, manually collected PGNs, games from unsupported sources).
 
+### Recruiter Evaluation Flow (No-Auth First)
+
+Expected recruiter journey:
+
+```text
+Homepage
+    ↓
+View sample analysis
+    ↓
+/demo seeded analysed games
+    ↓
+Coaching/trend UI
+    ↓
+/engineering (case study)
+```
+
+Assume recruiters will rarely create accounts, connect Chess.com, import games, or complete onboarding. Product pages should make engineering complexity and reliability visible immediately.
+
 ---
 
 ## MVP Pages
@@ -54,7 +78,23 @@ Manual PGN paste remains as a **secondary** "Import PGN manually" path (OTB game
 - Example mistake explanation
 - Features
 - Shareable analysis examples
-- Import CTA
+- Primary CTA: **View sample analysis** (to `/demo`)
+- Secondary CTA: import/connect flow
+
+### Public Demo Route (`/demo`)
+
+**Purpose**
+- Zero-friction portfolio evaluation
+- Show meaningful outputs in under 60 seconds of browsing
+
+**Requirements**
+- No authentication required
+- 2-3 pre-analysed seeded games
+- Representative coaching and trend outputs
+- Clear links to full analysis pages and engineering write-up
+- Optional guided walkthrough mode to highlight key UI/system states
+
+Seeded portfolio data exists specifically for demonstration and recruiter evaluation, not as production user data.
 
 ### Manual PGN Import Page (`/import`) — secondary path
 
@@ -173,6 +213,19 @@ The principle: **imported PGNs already have value before engine analysis runs.**
 - Highlight portfolio / CV value
 - Show technical architecture
 - Describe product philosophy
+
+### Engineering / Case Study Surface (`/engineering` or `/case-study` or `/about/build`)
+
+**Purpose**
+- Show how the system was designed and evolved, not only what it does
+
+**Core content**
+- architecture overview
+- async pipeline flow and explicit states
+- reliability trade-offs and failure handling
+- deterministic-before-LLM reasoning
+- screenshots and at least one lightweight architecture diagram
+- roadmap and sequencing rationale
 
 ---
 
@@ -347,6 +400,18 @@ Stage C — Coach (derived from analysed games)
         ↓
     Expose to frontend
 ```
+
+### Engineering Visibility Requirements (UI)
+
+The product should intentionally expose these indicators because they are both UX trust features and portfolio-signalling features:
+
+- analysis status badges
+- queue/processing states
+- move classifications
+- retry/failure states
+- engine depth indicators
+- deterministic vs AI-labelled insights
+- processing timeline cues
 
 ---
 

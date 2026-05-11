@@ -21,6 +21,37 @@ Most free chess analysis tools show engine lines and centipawn scores, but tell 
 - **Remember, not just report.** The app tracks mistakes across games so the user can see patterns — *"you keep missing backward rook moves"* — rather than re-discovering the same issue every session.
 - **Integrate human feedback.** Notes and advice from a chess club coach can be recorded alongside engine analysis.
 
+## Recruiter-Facing Positioning
+
+Built as a full-stack case study in asynchronous analysis systems, deterministic coaching signals, and product-grade UX for explainable chess improvement.
+
+The chess domain is the application layer. The portfolio signal is the engineering:
+
+- full-stack ownership across frontend, API, queues, workers, and data model
+- asynchronous system design with explicit lifecycle states
+- deterministic analysis and coaching pipeline before generative narration
+- explainable AI layering that narrates structured signals rather than replacing them
+- reliability-focused UX decisions (clear processing states, retries, and fallbacks)
+- product-oriented trade-offs that keep the MVP useful under real constraints
+
+## Recruiter Evaluation Reality
+
+Recruiters are unlikely to complete full onboarding or connect accounts. The product should support an instant evaluation path:
+
+```text
+Homepage
+    ↓
+View demo
+    ↓
+Sample analysed game
+    ↓
+Coaching + trend surfaces
+    ↓
+Engineering case study
+```
+
+This means no-auth exploration and immediate visibility of system depth are portfolio-critical, not optional polish.
+
 ## Connected Account Model
 
 Each app account links one or more chess identities (Chess.com, Lichess usernames). These are **the user's own accounts** — not followed players or arbitrary third-party accounts. All imported games, coaching language, trends, and insights are personalised to the owner of those linked identities.

@@ -4,6 +4,8 @@
 
 This feature branch is moving the app from a one-off PGN analysis tool into the foundation of a player improvement platform.
 
+It is also a public engineering case study in building an explainable, asynchronous analysis product with deterministic coaching signals and reliability-oriented UX.
+
 The current app can import games, analyse moves with Stockfish, classify mistakes, and replay a game on an interactive board. The next product step is to help a player understand their own habits over time: rating trends, blunder patterns, opening weaknesses, and recurring coaching themes.
 
 The long-term direction is:
@@ -66,6 +68,52 @@ Prioritise:
 * trend tracking
 * mistake summaries
 * useful coaching direction
+
+### 5. Make engineering depth legible
+
+Important system behaviour should be visible in product UI and docs:
+
+* explicit async states
+* processing and retry states
+* deterministic vs AI-labelled outputs
+* clear trust signals around explainability
+
+---
+
+## Dev Blog / Case Study Direction
+
+The writing plan should focus on engineering decisions and trade-offs, not feature announcements.
+
+### Core angles
+
+* async UX patterns and explicit state machines
+* reliability decisions in queue-backed pipelines
+* deterministic-before-LLM philosophy
+* explainability-focused interface design
+* schema evolution and backwards-compatible rollout paths
+* product trust decisions (what to expose, what to defer)
+
+### Suggested article topics
+
+* Idempotent imports in distributed pipelines
+* Explicit state machines in async systems
+* URL-driven replay state in React
+* Designing explainable AI-assisted interfaces
+* Modelling deterministic coaching signals
+
+### Public reader flow
+
+```text
+Homepage
+    ↓
+Demo analysis
+    ↓
+Coaching/trend surfaces
+    ↓
+Engineering case-study articles
+```
+
+The goal is to let recruiters and engineers understand the system design quickly without requiring account creation or long onboarding.
 
 ---
 

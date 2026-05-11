@@ -2,9 +2,21 @@
 
 Full-stack web app for **post-game chess analysis**: run engine-backed review, read **plain-English explanations** of your biggest mistakes, and **track recurring weaknesses** over time.
 
+Built as a full-stack case study in asynchronous analysis systems, deterministic coaching signals, and product-grade UX for explainable chess improvement.
+
 **Target user:** Amateur players (about 600–1400) who want structured improvement, not just engine numbers.
 
 **Core story:** Paste a PGN, wait about a minute, and see the **three most important moments** explained in plain language with the best move alongside.
+
+## Recruiter quick-eval path
+
+Planned no-friction evaluation flow:
+
+```text
+Homepage -> View sample analysis -> /demo seeded games -> coaching/trend UI -> /engineering case study
+```
+
+This repo prioritises visible engineering depth (async states, deterministic pipeline, reliability behaviours) over growth/onboarding mechanics in the current MVP phase.
 
 ## What this is not
 

@@ -2,6 +2,10 @@
 
 Full-stack web application for post-game chess analysis, AI explanations, and improvement tracking.
 
+Portfolio framing for these docs:
+
+> Built as a full-stack case study in asynchronous analysis systems, deterministic coaching signals, and product-grade UX for explainable chess improvement.
+
 > **Stack:** Next.js · Laravel · PostgreSQL · Stockfish · OpenAI API
 
 ---
@@ -68,11 +72,12 @@ Use [09-build-roadmap.md](./09-build-roadmap.md) for detailed checkboxes. Summar
 
 Current priority order (short version):
 
-1. **Finish the staged-pipeline UX** — game detail page must render for `pending` games (board + metadata + "Analyse this game" CTA, coaching panels locked, retry on `failed`); migrate `analysis_status` enum to `pending` / `queued` / `analysing` / `analysed` / `failed` and add `analysis_requested_at`; manual PGN import opt-in analyse toggle
-2. **Key moments + LLM explanations** in `/g/{share_code}` (key-moment selection + persistence + UI is now done; explanations are next)
-3. **Heuristic mistake tags** (small conservative subset first)
-4. **Notes + coaching/journal loop**
-5. **Dedicated dashboard/trends pages**, then Lichess and polish
+1. **Recruiter-ready no-auth demo path** — homepage "View sample analysis" CTA, `/demo` with seeded analysed games, visible coaching/trend outputs, link to engineering/case-study surface
+2. **Finish the staged-pipeline UX** — game detail page must render for `pending` games (board + metadata + "Analyse this game" CTA, coaching panels locked, retry on `failed`); migrate `analysis_status` enum to `pending` / `queued` / `analysing` / `analysed` / `failed` and add `analysis_requested_at`; manual PGN import opt-in analyse toggle
+3. **Key moments + LLM explanations** in `/g/{share_code}` (key-moment selection + persistence + UI is now done; explanations are next)
+4. **Heuristic mistake tags** (small conservative subset first)
+5. **Notes + coaching/journal loop**
+6. **Dedicated dashboard/trends pages**, then Lichess and polish
 
 See details in [09-build-roadmap.md](./09-build-roadmap.md) (Phase 3.5), [05-analysis-pipeline.md](./05-analysis-pipeline.md) (staged pipeline), [03-architecture.md](./03-architecture.md), and [11-profile-plan.md](./11-profile-plan.md).
 

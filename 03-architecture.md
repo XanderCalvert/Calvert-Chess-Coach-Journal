@@ -41,6 +41,39 @@ failed      — job errored; user can retry
 
 See [05-analysis-pipeline.md](./05-analysis-pipeline.md) for the staged pipeline detail.
 
+### Architecture Diagram Requirement
+
+Docs and the public engineering/case-study surface should include at least one lightweight diagram showing the end-to-end analysis path. Minimum required flow:
+
+```text
+PGN Import
+    ↓
+Laravel API
+    ↓
+Queue Worker
+    ↓
+Stockfish Analysis
+    ↓
+Deterministic Signal Layer
+    ↓
+Next.js Analysis UI
+```
+
+The diagram can be rendered as Markdown text, Mermaid, or a static image, but it must remain simple enough for non-specialist reviewers to parse quickly.
+
+### Engineering Surface Indicators (UX + Portfolio Signal)
+
+The UI should intentionally expose system sophistication and runtime state rather than hiding it:
+
+- analysis status badges (`pending` / `queued` / `analysing` / `analysed` / `failed`)
+- queue/processing states and retry/failure states
+- move classifications and key-moment ranking
+- engine depth indicators
+- deterministic-vs-AI labelled insight blocks
+- per-game processing timeline markers
+
+These indicators improve trust and reduce ambiguity for users while also making engineering decisions legible to recruiter/portfolio audiences.
+
 ## Stack
 
 ### Frontend

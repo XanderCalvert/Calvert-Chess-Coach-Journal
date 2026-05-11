@@ -10,31 +10,44 @@ Tick `- [ ]` → `- [x]` as you complete items. In GitHub or many editors, check
 
 The highest-value order from current state:
 
-1. **Split sync from analysis (staged pipeline)**
+1. **Recruiter no-auth demo flow and case-study surface**
+   - Homepage CTA: **"View sample analysis"**.
+   - Add `/demo` route with 2-3 pre-analysed seeded games and representative coaching/trend outputs.
+   - Add planned engineering route (`/engineering` or `/case-study`) summarising architecture, trade-offs, pipeline, screenshots/diagrams, and roadmap decisions.
+   - Preserve no-auth, zero-friction exploration for portfolio evaluation.
+2. **Split sync from analysis (staged pipeline)**
    - Sync should import metadata only (PGN, moves, result, opening, date, time control, ratings, opponent).
    - Stop auto-queuing `AnalyseGameJob` for every imported/synced game.
    - Auto-analyse only the **5 most-recent newly imported** games per sync run.
    - Migrate `analysis_status` enum to `pending` / `queued` / `analysing` / `analysed` / `failed`.
    - Add `POST /api/v1/games/{id}/analyse` for on-demand analysis.
-2. **Game list + game page work for `pending` games**
+3. **Game list + game page work for `pending` games**
    - Games list shows analysis state per row + inline "Analyse this game" for `pending` / `failed`.
    - Game detail page renders board replay + metadata before analysis; coaching panels lock until `analysed`.
    - Reframe `/import` as "Import PGN manually" — secondary path; primary entry remains the games list.
-3. **Key moments + plain-English explanations end-to-end**
+4. **Key moments + plain-English explanations end-to-end**
    - Persist/select top key moments reliably per analysed game.
    - Generate cached low-temperature explanations from deterministic board context.
    - Render key-moment cards in `/g/{share_code}` with jump-to-position support.
-4. **Heuristic mistake tags (MVP subset)**
+5. **Heuristic mistake tags (MVP subset)**
    - Start with conservative rules for 3–5 tags. *(move-level deterministic themes are in place)*
    - Store and display tags on key moments; user override can follow.
-5. **Journal UX basics**
+6. **Journal UX basics**
    - Manual notes + coach agreement path.
    - Lightweight summary/recommendation surfaces.
-6. **Then scale breadth**
+7. **Then scale breadth**
    - Dedicated trends/dashboard routes, Lichess import, polish/deploy.
    - Progressive coaching unlocks tied to count of analysed games (e.g. "Analyse 5 games to unlock your coaching report").
 
 This keeps the core promise strong while aligning the engine pipeline with the long-term self-coaching, scalable, premium-ready direction.
+
+Recruiter-facing objective for this phase:
+
+```text
+Homepage → View Demo → Sample analysis → Coaching/trends signal → Engineering case study
+```
+
+Prioritise visible product/system depth over growth/onboarding mechanics until this flow is strong.
 
 ---
 
@@ -138,8 +151,9 @@ Connected accounts are the user's **chess identity**, not optional integrations.
 
 - [ ] `/games/[id]/review` training mode page
 - [ ] `/profile` settings surfaces (explanation depth, linked account management)
-- [ ] Homepage/example analysis polish
-- [ ] `/about` build page
+- [ ] Homepage/example analysis polish with "View sample analysis" CTA
+- [ ] `/demo` route (no auth) with 2-3 pre-analysed seeded games and optional guided walkthrough mode
+- [ ] `/engineering` (or `/case-study`/`/about/build`) page with architecture, trade-offs, diagrams, and build evolution notes
 - [ ] Improve responsive behavior and empty/error states
 
 ### Phase 8 — Import Breadth and Launch

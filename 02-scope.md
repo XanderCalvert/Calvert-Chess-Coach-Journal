@@ -37,6 +37,28 @@ The app is a **quantified-self platform for chess improvement**, not a generic S
 
 Every architectural and UX decision should be measured against that principle.
 
+### Portfolio / Recruiter Framing
+
+The product is also intentionally built as a recruiter-visible engineering case study:
+
+> Built as a full-stack case study in asynchronous analysis systems, deterministic coaching signals, and product-grade UX for explainable chess improvement.
+
+Chess remains the domain context. The core signal for evaluation is engineering quality: async pipeline design, deterministic-first analysis, explicit state management, reliability behaviours, and explainability-focused product decisions.
+
+### Recruiter Evaluation Strategy
+
+Expected recruiter path:
+
+```text
+Homepage → View Demo → Analysed sample game → Coaching/trend UI → Engineering case-study page
+```
+
+Assume most recruiters will not create accounts, connect Chess.com, import games, or deeply onboard. MVP scope should therefore prioritise:
+
+- instant exploration
+- no-auth demo access
+- visible system sophistication in the first 1-2 screens
+
 ---
 
 ### Pipeline Direction — Sync vs Analysis vs Coaching
@@ -94,6 +116,14 @@ Key implications for scope:
 - Dashboard provides a useful at-a-glance summary
 - App is deployed and accessible at a public URL
 - README explains the architecture and how to run it locally
+
+### MVP Prioritisation Clarification
+
+For the current portfolio phase:
+
+- recruiter demo UX is a higher priority than onboarding polish
+- visible product/system depth is more important than growth mechanics
+- the near-term goal is engineering signal and case-study quality, not user acquisition loops
 
 ---
 
@@ -164,6 +194,11 @@ The staged pipeline maps cleanly to future monetisation. This is not an MVP feat
 - Opening database lookup (Phase 1 at earliest)
 - Any social or multiplayer feature
 - Rating-adaptive explanations (Phase 1)
+- CMS-heavy content systems
+- Newsletter mechanics
+- Gamification layers
+- Heavy SEO implementation work
+- Analytics dashboard expansion unless already required by current pages
 
 ---
 
