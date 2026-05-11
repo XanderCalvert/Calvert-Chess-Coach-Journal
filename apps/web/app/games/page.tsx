@@ -12,6 +12,13 @@ interface ConnectedAccount {
   last_synced_at: string | null
 }
 
+interface Quota {
+  quota_limit: number | null
+  quota_used: number | null
+  quota_remaining: number | null
+  quota_period_start: string | null
+}
+
 interface GameSummary {
   id: string
   connected_account_id: string | null
@@ -64,9 +71,11 @@ export default function GamesPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [filterAccountId, setFilterAccountId] = useState<string | null>(null)
+  const [quota, setQuota] = useState<Quota | null>(null)
   const [syncingIds, setSyncingIds] = useState<Set<string>>(new Set())
   const [syncMessages, setSyncMessages] = useState<Record<string, string>>({})
   const [analysingIds, setAnalysingIds] = useState<Set<string>>(new Set())
+  const [analyseErrors, setAnalyseErrors] = useState<Record<string, string>>({})
   const [page, setPage] = useState(1)
 
   useEffect(() => {
@@ -84,7 +93,9 @@ export default function GamesPage() {
         }
         const accountsData = await accountsRes.json()
         setAccounts(accountsData.data ?? [])
-        setGames(await gamesRes.json())
+        const gamesData = await gamesRes.json()
+        setGames(gamesData.data ?? gamesData)
+        if (gamesData.quota) setQuota(gamesData.quota)
       } catch {
         setError('Network error. Please refresh.')
       } finally {
@@ -123,13 +134,48 @@ export default function GamesPage() {
     }
   }
 
+  async function handleSyncFull(account: ConnectedAccount) {
+    setSyncingIds(prev => new Set(prev).add(account.id))
+    setSyncMessages(prev => ({ ...prev, [account.id]: '' }))
+
+    try {
+      const res = await fetch(
+        `/api/connected-accounts/${account.platform}/${account.username}/sync-full`,
+        { method: 'POST' },
+      )
+      if (res.status === 202) {
+        setSyncMessages(prev => ({
+          ...prev,
+          [account.id]: 'Full sync started. This may take a while for large histories.',
+        }))
+        setAccounts(prev =>
+          prev.map(a => a.id === account.id ? { ...a, sync_status: 'syncing' } : a)
+        )
+      } else if (res.status === 409) {
+        setSyncMessages(prev => ({ ...prev, [account.id]: 'Already syncing.' }))
+        setSyncingIds(prev => { const s = new Set(prev); s.delete(account.id); return s })
+      } else {
+        setSyncMessages(prev => ({ ...prev, [account.id]: 'Sync failed. Please try again.' }))
+        setSyncingIds(prev => { const s = new Set(prev); s.delete(account.id); return s })
+      }
+    } catch {
+      setSyncMessages(prev => ({ ...prev, [account.id]: 'Could not reach server.' }))
+      setSyncingIds(prev => { const s = new Set(prev); s.delete(account.id); return s })
+    }
+  }
+
   async function handleAnalyse(gameId: string) {
     setAnalysingIds(prev => new Set(prev).add(gameId))
+    setAnalyseErrors(prev => { const n = { ...prev }; delete n[gameId]; return n })
     setGames(prev => prev.map(g => g.id === gameId ? { ...g, analysis_status: 'queued' } : g))
     try {
       const res = await fetch(`/api/games/${gameId}/analyse`, { method: 'POST' })
-      if (res.status !== 202 && res.status !== 409) {
-        // revert optimistic update on unexpected error
+      if (res.status === 422) {
+        const body = await res.json().catch(() => ({}))
+        const msg = body?.message ?? 'Monthly analysis quota exceeded.'
+        setAnalyseErrors(prev => ({ ...prev, [gameId]: msg }))
+        setGames(prev => prev.map(g => g.id === gameId ? { ...g, analysis_status: 'pending' } : g))
+      } else if (res.status !== 202 && res.status !== 409) {
         setGames(prev => prev.map(g => g.id === gameId ? { ...g, analysis_status: 'pending' } : g))
       }
     } catch {
@@ -187,24 +233,85 @@ export default function GamesPage() {
                         </span>
                       )}
                     </div>
-                    <button
-                      onClick={() => handleSync(account)}
-                      disabled={isSyncing}
-                      className="text-xs px-3 py-1.5 rounded whitespace-nowrap"
-                      style={{
-                        background: isSyncing ? 'transparent' : 'var(--gold)',
-                        color: isSyncing ? 'var(--text-muted)' : 'var(--bg)',
-                        border: isSyncing ? '1px solid rgba(232,224,208,0.15)' : 'none',
-                        cursor: isSyncing ? 'not-allowed' : 'pointer',
-                      }}
-                    >
-                      {isSyncing ? 'Syncing…' : 'Sync now'}
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleSync(account)}
+                        disabled={isSyncing}
+                        className="text-xs px-3 py-1.5 rounded whitespace-nowrap"
+                        style={{
+                          background: isSyncing ? 'transparent' : 'var(--gold)',
+                          color: isSyncing ? 'var(--text-muted)' : 'var(--bg)',
+                          border: isSyncing ? '1px solid rgba(232,224,208,0.15)' : 'none',
+                          cursor: isSyncing ? 'not-allowed' : 'pointer',
+                        }}
+                      >
+                        {isSyncing ? 'Syncing…' : 'Sync now'}
+                      </button>
+                      {/* TODO: gate as premium-only once subscription flow exists */}
+                      <button
+                        onClick={() => handleSyncFull(account)}
+                        disabled={isSyncing}
+                        className="text-xs px-3 py-1.5 rounded whitespace-nowrap"
+                        style={{
+                          background: 'transparent',
+                          color: isSyncing ? 'var(--text-faint)' : 'var(--text-muted)',
+                          border: '1px solid rgba(232,224,208,0.15)',
+                          cursor: isSyncing ? 'not-allowed' : 'pointer',
+                        }}
+                      >
+                        Sync full history
+                      </button>
+                    </div>
                   </div>
                 )
               })}
             </div>
           </section>
+        )}
+
+        {/* Quota bar — free users only */}
+        {!loading && quota && quota.quota_limit !== null && (
+          quota.quota_remaining === 0 ? (
+            <div
+              className="px-4 py-3 rounded text-sm flex items-center justify-between gap-4"
+              style={{ border: '1px solid rgba(201,168,76,0.35)', background: 'rgba(201,168,76,0.06)' }}
+            >
+              <span style={{ color: 'var(--gold)' }}>
+                You&apos;ve used your {quota.quota_limit} free analyses this month.
+              </span>
+              <span className="text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
+                Upgrade for unlimited →
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--text-muted)' }}>
+              <span className="whitespace-nowrap">
+                Analysis quota: {quota.quota_used} / {quota.quota_limit} used this month
+              </span>
+              <div
+                className="flex-1 rounded-full overflow-hidden"
+                style={{ height: 4, background: 'rgba(232,224,208,0.10)', maxWidth: 120 }}
+              >
+                <div
+                  style={{
+                    height: '100%',
+                    width: `${Math.round(((quota.quota_used ?? 0) / quota.quota_limit) * 100)}%`,
+                    background: (quota.quota_remaining ?? 0) <= 2 ? '#f87171' : 'var(--gold)',
+                    borderRadius: 9999,
+                  }}
+                />
+              </div>
+              {quota.quota_period_start && (() => {
+                const start = new Date(quota.quota_period_start + 'T00:00:00')
+                const nextMonth = new Date(start.getFullYear(), start.getMonth() + 1, 1)
+                return (
+                  <span style={{ color: 'var(--text-faint)' }}>
+                    Resets {nextMonth.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                  </span>
+                )
+              })()}
+            </div>
+          )
         )}
 
         {/* Games list */}
@@ -337,6 +444,7 @@ export default function GamesPage() {
                     {pageGames.map((g, i) => {
                       const status = STATUS_STYLES[g.analysis_status] ?? STATUS_STYLES.pending
                       const canAnalyse = g.analysis_status === 'pending' || g.analysis_status === 'failed'
+                      const quotaExhausted = quota?.quota_remaining === 0 && quota?.quota_limit !== null
                       return (
                         <tr
                           key={g.id}
@@ -398,20 +506,35 @@ export default function GamesPage() {
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
                             {canAnalyse ? (
-                              <button
-                                onClick={() => handleAnalyse(g.id)}
-                                disabled={analysingIds.has(g.id)}
-                                className="text-xs px-3 py-1 rounded"
-                                style={{
-                                  color: 'var(--gold)',
-                                  border: '1px solid rgba(201,168,76,0.35)',
-                                  background: 'rgba(201,168,76,0.08)',
-                                  cursor: analysingIds.has(g.id) ? 'not-allowed' : 'pointer',
-                                  opacity: analysingIds.has(g.id) ? 0.6 : 1,
-                                }}
-                              >
-                                Analyse
-                              </button>
+                              <div className="flex flex-col gap-1">
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => !quotaExhausted && handleAnalyse(g.id)}
+                                    disabled={analysingIds.has(g.id) || quotaExhausted}
+                                    title={quotaExhausted ? 'Monthly quota reached — upgrade for unlimited' : undefined}
+                                    className="text-xs px-3 py-1 rounded"
+                                    style={{
+                                      color: quotaExhausted ? 'var(--text-faint)' : 'var(--gold)',
+                                      border: quotaExhausted ? '1px solid rgba(232,224,208,0.10)' : '1px solid rgba(201,168,76,0.35)',
+                                      background: quotaExhausted ? 'transparent' : 'rgba(201,168,76,0.08)',
+                                      cursor: (analysingIds.has(g.id) || quotaExhausted) ? 'not-allowed' : 'pointer',
+                                      opacity: analysingIds.has(g.id) ? 0.6 : 1,
+                                    }}
+                                  >
+                                    Analyse
+                                  </button>
+                                  {!quotaExhausted && quota?.quota_remaining !== null && (quota?.quota_remaining ?? 99) <= 2 && (
+                                    <span className="text-xs" style={{ color: '#f87171' }}>
+                                      {quota?.quota_remaining} left
+                                    </span>
+                                  )}
+                                </div>
+                                {analyseErrors[g.id] && (
+                                  <span className="text-xs" style={{ color: '#f87171' }}>
+                                    {analyseErrors[g.id]}
+                                  </span>
+                                )}
+                              </div>
                             ) : (
                               <span className="text-xs" style={{ color: status.color }}>{status.label}</span>
                             )}

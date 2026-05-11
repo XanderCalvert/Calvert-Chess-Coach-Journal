@@ -430,6 +430,24 @@ class ConnectedAccountController extends Controller
         return response()->json($this->formatAccount($account->fresh()), 202);
     }
 
+    // TODO: gate as premium-only once subscription flow exists
+    public function syncFull(string $platform, string $username): JsonResponse
+    {
+        $account = ConnectedAccount::where('platform', $platform)
+            ->where('normalised_username', strtolower($username))
+            ->where('user_id', auth()->id())
+            ->firstOrFail();
+
+        if ($account->sync_status === SyncStatus::Syncing) {
+            return response()->json($this->formatAccount($account), 409);
+        }
+
+        SyncChessComAccountJob::dispatch($account->id, fullArchive: true);
+        $account->update(['sync_status' => SyncStatus::Syncing->value]);
+
+        return response()->json($this->formatAccount($account->fresh()), 202);
+    }
+
     public function destroy(string $id): JsonResponse
     {
         $account = ConnectedAccount::where('id', $id)

@@ -86,6 +86,37 @@ Seeds a development user, submits a representative PGN-derived payload, and vali
 |------|------------------|
 | `test_returns_paginated_payload_with_empty_data_when_no_accounts` | List endpoint returns a stable paginated contract with empty `data` and correct `meta` defaults. |
 | `test_returns_accounts_ordered_by_platform_then_username` | Accounts are returned in deterministic order (`platform`, then `username`). |
+| `test_does_not_return_other_users_accounts` | List endpoint scopes results to the authenticated user only. |
+| `test_sync_another_users_account_returns_404` | Sync endpoint cannot be used against another user's connected account. |
+
+---
+
+## Feature — auth endpoints and profile payload
+
+**File:** [`Feature/AuthTest.php`](Feature/AuthTest.php)
+
+| Test | What it verifies |
+|------|------------------|
+| `test_login_with_valid_credentials_returns_token` | Valid credentials create/return a web-session token and user payload. |
+| `test_login_with_invalid_credentials_returns_401` | Invalid credentials are rejected with `401`. |
+| `test_logout_revokes_token` | Logout deletes active web-session token(s). |
+| `test_second_login_replaces_previous_token` | Re-login preserves single-session token behavior for `web-session`. |
+| `test_register_with_valid_data_creates_user_and_returns_token` | Register creates a user and returns token plus `has_connected_accounts`. |
+| `test_me_returns_free_tier_quota_payload` | `GET /auth/me` includes free-tier quota contract values. |
+| `test_me_returns_null_quota_payload_for_premium_user` | `GET /auth/me` returns null quota fields for premium tier. |
+
+---
+
+## Feature — authenticated game list contract
+
+**File:** [`Feature/GameListTest.php`](Feature/GameListTest.php)
+
+| Test | What it verifies |
+|------|------------------|
+| `test_returns_200_with_empty_array_when_no_games` | Empty list still returns a stable payload contract. |
+| `test_does_not_return_other_users_games` | Game listing is scoped to the authenticated user only. |
+| `test_response_includes_quota_for_free_user` | Game list payload includes free-tier quota status block. |
+| `test_response_includes_subscription_tier` | Game list payload includes the user's subscription tier. |
 
 ---
 
@@ -122,6 +153,15 @@ Seeds a development user, submits a representative PGN-derived payload, and vali
 | `test_recent_window_caps_at_twenty_from_newest_months` | Recent-window mode matches the web sync cap (20 games, newest months first). |
 | `test_command_requires_account_without_create` | Command fails when no `connected_accounts` row exists and `--create` is not passed. |
 | `test_command_create_option_inserts_row_and_dispatches_job` | `--create` upserts a row and dispatches the sync job to the queue. |
+
+**File:** [`Feature/SyncFullEndpointTest.php`](Feature/SyncFullEndpointTest.php)
+
+| Test | What it verifies |
+|------|------------------|
+| `test_sync_full_returns_202_and_dispatches_full_archive_job` | Authenticated full-sync endpoint dispatches `SyncChessComAccountJob` with `fullArchive=true` and marks account syncing. |
+| `test_sync_full_returns_409_when_already_syncing` | Endpoint rejects duplicate full-sync requests when the account is already syncing. |
+| `test_sync_full_requires_authentication` | Full-sync endpoint is protected by auth and returns `401` without token. |
+| `test_sync_full_returns_404_for_another_users_account` | Full-sync endpoint cannot access another user's connected account. |
 
 ---
 

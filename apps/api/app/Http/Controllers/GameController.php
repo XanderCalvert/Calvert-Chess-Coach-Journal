@@ -10,6 +10,7 @@ use App\Jobs\AnalyseGameJob;
 use App\Models\Game;
 use App\Models\KeyMoment;
 use App\Models\Move;
+use App\Models\User;
 use App\Support\ShareCodeGenerator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -20,7 +21,10 @@ class GameController extends Controller
 {
     public function index(): JsonResponse
     {
-        $games = Game::forUser(auth()->id())
+        /** @var User $user */
+        $user = auth()->user();
+
+        $games = Game::forUser($user->id)
             ->orderByDesc('played_at')
             ->orderByDesc('created_at')
             ->get()
@@ -44,7 +48,20 @@ class GameController extends Controller
                 'share_code'           => $g->share_code,
             ]);
 
-        return response()->json($games);
+        $quota = $user->isPremium()
+            ? ['quota_limit' => null, 'quota_used' => null, 'quota_remaining' => null, 'quota_period_start' => null]
+            : [
+                'quota_limit'        => $user->quotaLimit(),
+                'quota_used'         => $user->analysis_quota_used,
+                'quota_remaining'    => $user->quotaRemaining(),
+                'quota_period_start' => $user->quota_period_start?->toDateString(),
+            ];
+
+        return response()->json([
+            'data'              => $games,
+            'subscription_tier' => $user->subscription_tier,
+            'quota'             => $quota,
+        ]);
     }
 
     public function show(string $id): JsonResponse
@@ -77,9 +94,40 @@ class GameController extends Controller
             return response()->json(['message' => 'Analysis already in progress or complete.'], 409);
         }
 
-        $game->update(['analysis_status' => AnalysisStatus::Queued, 'analysis_requested_at' => now()]);
+        // Quota consumed on acceptance, not completion. Failed jobs still spend quota.
+        // Future: refund quota when AnalyseGameJob exhausts retries.
+        $quotaExceeded = false;
 
-        AnalyseGameJob::dispatch($game->id)->afterCommit();
+        DB::transaction(function () use ($game, &$quotaExceeded) {
+            $user = User::whereKey(auth()->id())->lockForUpdate()->first();
+            $user->resetPeriodIfRolled();
+
+            $limit = $user->quotaLimit();
+            if ($limit !== null && $user->analysis_quota_used >= $limit) {
+                $quotaExceeded = true;
+                return;
+            }
+
+            if ($limit !== null) {
+                $user->analysis_quota_used++;
+                $user->save();
+            }
+
+            $game->analysis_status       = AnalysisStatus::Queued;
+            $game->analysis_requested_at = now();
+            $game->save();
+
+            AnalyseGameJob::dispatch($game->id)->afterCommit();
+        });
+
+        if ($quotaExceeded) {
+            $user = auth()->user();
+            return response()->json([
+                'message'     => 'Monthly analysis quota exceeded.',
+                'quota_used'  => $user->analysis_quota_used,
+                'quota_limit' => $user->quotaLimit(),
+            ], 422);
+        }
 
         return response()->json(['message' => 'Analysis queued.'], 202);
     }

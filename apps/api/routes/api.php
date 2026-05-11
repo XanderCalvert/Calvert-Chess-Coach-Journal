@@ -40,5 +40,6 @@ Route::prefix('v1')->group(function () {
         Route::post('/connected-accounts', [ConnectedAccountController::class, 'store']);
         Route::delete('/connected-accounts/{id}', [ConnectedAccountController::class, 'destroy']);
         Route::post('/connected-accounts/by-username/{platform}/{username}/sync', [ConnectedAccountController::class, 'sync']);
+        Route::post('/connected-accounts/by-username/{platform}/{username}/sync-full', [ConnectedAccountController::class, 'syncFull']);
     });
 });

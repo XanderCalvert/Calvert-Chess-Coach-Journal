@@ -71,6 +71,20 @@ class AuthController extends Controller
 
     public function me(Request $request): JsonResponse
     {
-        return response()->json($request->user()->append('has_connected_accounts'));
+        $user = $request->user()->append('has_connected_accounts');
+
+        $quota = $user->isPremium()
+            ? ['quota_limit' => null, 'quota_used' => null, 'quota_remaining' => null, 'quota_period_start' => null]
+            : [
+                'quota_limit'        => $user->quotaLimit(),
+                'quota_used'         => $user->analysis_quota_used,
+                'quota_remaining'    => $user->quotaRemaining(),
+                'quota_period_start' => $user->quota_period_start?->toDateString(),
+            ];
+
+        return response()->json(array_merge($user->toArray(), [
+            'subscription_tier' => $user->subscription_tier,
+            'quota'             => $quota,
+        ]));
     }
 }

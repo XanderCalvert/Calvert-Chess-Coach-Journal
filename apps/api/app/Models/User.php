@@ -15,8 +15,9 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use Illuminate\Support\Carbon;
 
-#[Fillable(['email', 'password', 'display_name', 'rating_estimate', 'explanation_depth'])]
+#[Fillable(['email', 'password', 'display_name', 'rating_estimate', 'explanation_depth', 'subscription_tier', 'analysis_quota_used', 'quota_period_start'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -26,10 +27,46 @@ class User extends Authenticatable
     protected function casts(): array
     {
         return [
-            'email_verified_at' => 'datetime',
-            'password'          => 'hashed',
-            'explanation_depth' => ExplanationDepth::class,
+            'email_verified_at'    => 'datetime',
+            'password'             => 'hashed',
+            'explanation_depth'    => ExplanationDepth::class,
+            'analysis_quota_used'  => 'integer',
+            'quota_period_start'   => 'date',
         ];
+    }
+
+    public function isPremium(): bool
+    {
+        return $this->subscription_tier === 'premium';
+    }
+
+    /** Returns the monthly analysis limit, or null for unlimited (premium). */
+    public function quotaLimit(): ?int
+    {
+        return $this->isPremium() ? null : config('chess.free_monthly_analysis_quota');
+    }
+
+    /**
+     * Returns remaining analyses this month, or null for unlimited (premium).
+     * Resets the counter in-memory if the quota period has rolled over; caller
+     * must save() the model (or use consumeQuota() inside a transaction).
+     */
+    public function resetPeriodIfRolled(): void
+    {
+        $currentPeriod = Carbon::now()->startOfMonth()->toDateString();
+        if ($this->quota_period_start === null || $this->quota_period_start->toDateString() < $currentPeriod) {
+            $this->analysis_quota_used = 0;
+            $this->quota_period_start  = $currentPeriod;
+        }
+    }
+
+    public function quotaRemaining(): ?int
+    {
+        if ($this->isPremium()) {
+            return null;
+        }
+        $this->resetPeriodIfRolled();
+        return max(0, $this->quotaLimit() - $this->analysis_quota_used);
     }
 
     public function connectedAccounts(): HasMany

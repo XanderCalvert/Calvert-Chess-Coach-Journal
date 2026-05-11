@@ -3,9 +3,12 @@
 namespace App\Jobs;
 
 use App\Enums\AnalysisStatus;
+use App\Models\ConnectedAccount;
 use App\Models\Game;
+use App\Models\User;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class QueueRecentAnalysisJob implements ShouldQueue
@@ -20,22 +23,46 @@ class QueueRecentAnalysisJob implements ShouldQueue
 
     public function handle(): void
     {
-        $limit = config('chess.auto_analyse_on_sync', 5);
+        $syncLimit = config('chess.auto_analyse_on_sync', 5);
 
-        $games = Game::where('connected_account_id', $this->connectedAccountId)
+        $account = ConnectedAccount::with('user')->findOrFail($this->connectedAccountId);
+        $user    = $account->user;
+
+        $candidates = Game::where('connected_account_id', $this->connectedAccountId)
             ->where('analysis_status', AnalysisStatus::Pending)
             ->orderByDesc('played_at')
-            ->limit($limit)
+            ->limit($syncLimit)
             ->get();
 
-        foreach ($games as $game) {
-            $game->update(['analysis_status' => AnalysisStatus::Queued]);
-            AnalyseGameJob::dispatch($game->id)->afterCommit();
-        }
+        $dispatched = 0;
+
+        DB::transaction(function () use ($user, $candidates, &$dispatched) {
+            $lockedUser = User::whereKey($user->id)->lockForUpdate()->first();
+            $lockedUser->resetPeriodIfRolled();
+
+            foreach ($candidates as $game) {
+                $limit = $lockedUser->quotaLimit();
+                if ($limit !== null && $lockedUser->analysis_quota_used >= $limit) {
+                    break;
+                }
+
+                if ($limit !== null) {
+                    $lockedUser->analysis_quota_used++;
+                }
+
+                $game->analysis_status = AnalysisStatus::Queued;
+                $game->save();
+
+                AnalyseGameJob::dispatch($game->id)->afterCommit();
+                $dispatched++;
+            }
+
+            $lockedUser->save();
+        });
 
         Log::info('QueueRecentAnalysisJob: queued analysis', [
             'connected_account_id' => $this->connectedAccountId,
-            'count'                => $games->count(),
+            'count'                => $dispatched,
         ]);
     }
 }

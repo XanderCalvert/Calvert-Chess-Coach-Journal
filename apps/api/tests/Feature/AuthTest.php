@@ -175,4 +175,49 @@ class AuthTest extends TestCase
             ->assertStatus(200)
             ->assertJsonStructure(['has_connected_accounts']);
     }
+
+    public function test_me_returns_free_tier_quota_payload(): void
+    {
+        config(['chess.free_monthly_analysis_quota' => 10]);
+        $user = $this->createUser([
+            'subscription_tier'   => 'free',
+            'analysis_quota_used' => 4,
+            'quota_period_start'  => now()->startOfMonth()->toDateString(),
+        ]);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/auth/me')
+            ->assertStatus(200)
+            ->assertJson([
+                'subscription_tier' => 'free',
+                'quota' => [
+                    'quota_limit'        => 10,
+                    'quota_used'         => 4,
+                    'quota_remaining'    => 6,
+                    'quota_period_start' => now()->startOfMonth()->toDateString(),
+                ],
+            ]);
+    }
+
+    public function test_me_returns_null_quota_payload_for_premium_user(): void
+    {
+        $user = $this->createUser([
+            'subscription_tier'   => 'premium',
+            'analysis_quota_used' => 123,
+            'quota_period_start'  => now()->startOfMonth()->toDateString(),
+        ]);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/auth/me')
+            ->assertStatus(200)
+            ->assertJson([
+                'subscription_tier' => 'premium',
+                'quota' => [
+                    'quota_limit'        => null,
+                    'quota_used'         => null,
+                    'quota_remaining'    => null,
+                    'quota_period_start' => null,
+                ],
+            ]);
+    }
 }
