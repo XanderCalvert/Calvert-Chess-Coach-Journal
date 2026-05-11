@@ -17,7 +17,6 @@ export default function ImportPage() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setLoading(true)
-    setResult(null)
     setError(null)
 
     try {

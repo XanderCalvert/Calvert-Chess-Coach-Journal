@@ -688,7 +688,7 @@ function GameAnalysisViewInner({ game, initialPly, onPlyChange, onRequestAnalysi
             )}
           </div>
 
-          {game.analysis_status === 'complete' ? (
+          {game.analysis_status === 'analysed' ? (
             <>
               <MoveDetailPanel
                 move={currentMove}

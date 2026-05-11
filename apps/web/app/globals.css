@@ -51,3 +51,29 @@ body {
   transition: color 0.2s;
 }
 .nav-link:hover { color: var(--text); }
+
+.blog-content h2 {
+  margin-top: 2rem;
+  margin-bottom: 0.75rem;
+  font-family: var(--font-playfair);
+  font-size: 1.5rem;
+}
+
+.blog-content p,
+.blog-content li {
+  color: var(--text-muted);
+  line-height: 1.85;
+}
+
+.blog-content p {
+  margin-bottom: 1rem;
+}
+
+.blog-content ul,
+.blog-content ol {
+  margin: 0.75rem 0 1.25rem 1.5rem;
+}
+
+.blog-content strong {
+  color: var(--text);
+}

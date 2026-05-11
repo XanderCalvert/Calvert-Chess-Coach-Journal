@@ -24,6 +24,11 @@ export default function ChessBoardViewer({
     squareStyles[lastMove.to]   = { background: 'rgba(201,168,76,0.55)' }
   }
 
+  const handlePieceDrop = onPieceDrop
+    ? ({ sourceSquare, targetSquare, piece }: { sourceSquare: string; targetSquare: string | null; piece: unknown }) =>
+        targetSquare ? onPieceDrop(sourceSquare, targetSquare, String(piece)) : false
+    : undefined
+
   return (
     <Chessboard
       options={{
@@ -31,7 +36,7 @@ export default function ChessBoardViewer({
         boardOrientation: orientation,
         squareStyles,
         allowDragging,
-        onPieceDrop,
+        onPieceDrop: handlePieceDrop,
         darkSquareStyle:  { backgroundColor: '#2a231a' },
         lightSquareStyle: { backgroundColor: '#4a3d2a' },
       }}

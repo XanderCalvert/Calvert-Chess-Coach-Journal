@@ -1,0 +1,131 @@
+---
+title: "Why We Split Sync From Analysis"
+summary: "How moving from \"analyse everything\" to a staged pipeline improved reliability, speed, and product clarity."
+publishedAt: "2026-05-11"
+tags:
+  - architecture
+  - backend
+  - product
+status: "published"
+featured: true
+---
+
+When this project started, the simplest pipeline was obvious: import games, queue analysis, then render insights when jobs finished. It was easy to explain and easy to ship. It was also the wrong long-term shape.
+
+As soon as connected account sync became a regular workflow, the old design started to show stress. A single sync could fan out into dozens of analysis jobs. That meant queue spikes, slower time to first value, and inconsistent UX for users who only cared about their most recent games.
+
+This post explains why we split sync from analysis, and why that change matters beyond backend neatness.
+
+## The old model looked clean, but overloaded the system
+
+The first model was effectively:
+
+1. Pull games from an external source.
+2. Store them.
+3. Queue full analysis for every imported game.
+
+That gave one mental model, but it tied two different workloads together:
+
+- **Import** is mostly I/O and deduplication.
+- **Analysis** is CPU-heavy and queue-dependent.
+
+Coupling those two jobs created a bottleneck where every successful sync immediately generated expensive background work, even when that work was not needed right now.
+
+## We reframed the workflow around user value timing
+
+A user who syncs an account usually wants one of two things:
+
+- quick confirmation that games are in the system, or
+- analysis for a small number of recent or interesting games.
+
+They rarely need deep engine analysis for every historical game at that exact moment. Once we treated this as a timing problem, the architecture direction became clear:
+
+- sync should be cheap and broad,
+- analysis should be selective and intentional.
+
+So the pipeline shifted to staged states:
+
+- **Imported**
+- **Queued / Analysing**
+- **Analysed**
+
+That structure gives control over when expensive work happens, without losing coverage over the full game archive.
+
+## What changed in practice
+
+We introduced a staged fan-out strategy:
+
+- sync imports metadata and PGN for all matching games,
+- only a recent subset is auto-queued for analysis,
+- any individual game can be analysed on demand from the UI.
+
+That immediately improved operational behavior:
+
+- queue pressure became predictable,
+- sync jobs finished faster,
+- users saw new games quickly,
+- analysis compute was spent where it mattered first.
+
+The user experience got simpler too. Instead of a hidden all-or-nothing background process, each game now has an explicit analysis state and can be progressed intentionally.
+
+## Why this matters for reliability
+
+The previous model mixed failure domains. If analysis workers were delayed, sync felt broken even when import had worked. By decoupling the phases, we can now isolate failure and recovery:
+
+- sync can succeed independently,
+- analysis retries target only affected games,
+- UI can surface state-specific actions (for example, retry analysis).
+
+That separation is also better for observability. You can now ask clear operational questions:
+
+- how many games were imported today,
+- how many are pending analysis,
+- how long does a queued game take to complete.
+
+Those are much harder to answer when all work is forced through one pipeline stage.
+
+## Product impact: faster “time to trust”
+
+The product promise is not “we run many jobs.” The promise is “we help you improve with clear feedback.” In that context, time to trust matters more than total background throughput.
+
+A staged pipeline supports that by letting us optimize the first meaningful experience:
+
+- user syncs account,
+- sees recent games quickly,
+- analyses one game immediately,
+- understands the feedback loop.
+
+After that, deeper batch analysis can continue in the background without blocking user progress.
+
+## This also supports tiering without rework
+
+A subtle advantage of staged architecture is future commercial flexibility. If analysis becomes a metered feature, the system is already built around explicit trigger points and statuses.
+
+That means free/premium boundaries can be introduced as policy, not as a core rearchitecture. In practice:
+
+- import remains broad and low-cost,
+- analysis quotas can be enforced at enqueue time,
+- premium unlocks can raise or remove those limits.
+
+The product can evolve without rewriting core flow.
+
+## Trade-offs we accepted
+
+This change is not free. We accepted:
+
+- more status handling in backend and UI,
+- more explicit user actions,
+- slightly more complex tests around queue fan-out and idempotency.
+
+Those are good costs because they buy predictable behavior and clearer ownership of expensive operations.
+
+## What this enables next
+
+Splitting sync from analysis is a foundation change, not a finishing touch. It unlocks:
+
+- pending-aware game detail pages,
+- robust retry flows,
+- coaching depth that scales with analysed game count,
+- and eventually AI narration layered on deterministic signals.
+
+Most importantly, it keeps the product honest: fast where it should be fast, deep where depth is earned, and understandable at every step.

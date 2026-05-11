@@ -113,4 +113,5 @@ export const CTA = {
 export const FOOTER = {
   logo: "♟ Chess Coach Journal",
   note: "Open source · Portfolio project · v1.0",
+  devBlog: { label: "Dev Blog", href: "/blog" },
 } as const;

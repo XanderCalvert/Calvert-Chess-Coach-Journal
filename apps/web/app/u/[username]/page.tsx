@@ -234,7 +234,7 @@ function fmtSignedDelta(n: number, decimals = 0): string {
   return '±0'
 }
 
-function isGameTypeFilter(value: string | null): value is Exclude<GameTypeFilter, 'all'> {
+function isGameTypeFilter(value: string | null | undefined): value is Exclude<GameTypeFilter, 'all'> {
   return value === 'bullet' || value === 'blitz' || value === 'rapid' || value === 'daily'
 }
 

@@ -502,7 +502,7 @@ export default function GamesPage() {
                             className="px-4 py-3 font-medium"
                             style={{ color: 'var(--gold)', fontFamily: 'var(--font-dm-mono)' }}
                           >
-                            {g.analysis_status === 'complete' && g.accuracy_pct != null ? `${g.accuracy_pct}%` : '—'}
+                            {g.analysis_status === 'analysed' && g.accuracy_pct != null ? `${g.accuracy_pct}%` : '—'}
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
                             {canAnalyse ? (

@@ -1,0 +1,119 @@
+---
+title: "Why Deterministic Coaching Comes Before LLM Narration"
+summary: "The reasoning behind building structured coaching signals first, then layering AI explanations on top."
+publishedAt: "2026-05-10"
+tags:
+  - ai
+  - product-quality
+  - coaching
+status: "published"
+---
+
+AI explanation is a core part of this product vision, but it is not the first system we built. That was deliberate.
+
+Before an LLM writes a single sentence, the platform computes deterministic coaching data from engine output and board context. This includes move classifications, tactical flags, threat awareness, risk notes, and key moments. The AI layer is then expected to narrate that structured signal, not invent the ground truth.
+
+This post explains why that order matters.
+
+## The wrong order creates fragile confidence
+
+If AI narration comes first, two problems appear immediately:
+
+1. **Inconsistency risk**: the model can phrase ideas that sound plausible but drift from engine reality.
+2. **Debugging opacity**: when feedback quality drops, it is hard to tell whether the issue is position analysis, prompt design, or model behavior.
+
+For a chess improvement product, both are dangerous. Users need to trust that advice is anchored to concrete position logic, not just fluent language.
+
+## Deterministic first means explainable internals
+
+By building structured signals first, every coaching output has a traceable base:
+
+- what the engine preferred,
+- what the player chose,
+- what tactical or strategic concept was involved,
+- how severe the mistake was,
+- and why the moment ranked as important.
+
+This gives us an internal chain of evidence. Even before AI is involved, the system can provide meaningful guidance. That means AI is an enhancement layer, not a single point of truth.
+
+## Reliability beats novelty in early product stages
+
+It is tempting to optimize for impressive prose early. We chose the opposite: optimize for repeatable correctness.
+
+When deterministic outputs are stable:
+
+- tests are easier to write and maintain,
+- regressions are easier to detect,
+- model changes are safer because baseline truth is fixed.
+
+This is especially important in a product where users may compare feedback across many games over time. Consistency matters more than rhetorical flair.
+
+## Prompt design gets better with structured inputs
+
+LLMs perform better when they receive explicit context instead of raw dumps. A raw engine line is information-dense but instruction-poor. Structured coaching fields convert that into a clearer representation of intent.
+
+For example, rather than giving only centipawn deltas, we can include:
+
+- mistake category,
+- threat missed or created,
+- phase context,
+- and key principle violated.
+
+That leads to prompts that are smaller, less ambiguous, and easier to keep deterministic with low temperature settings.
+
+## It improves fallback behavior too
+
+No model call is guaranteed. APIs fail, budgets change, latency spikes happen. A deterministic-first architecture guarantees graceful degradation:
+
+- if AI is unavailable, core coaching still exists,
+- if AI response quality is poor, deterministic notes remain visible,
+- if we disable narration temporarily, product value does not collapse.
+
+This makes operations safer and product trust more resilient.
+
+## User trust is cumulative, and easy to lose
+
+In chess, users can often verify advice quickly. If one explanation contradicts obvious board logic, trust drops sharply. Recovering that trust is far harder than earning it slowly.
+
+A deterministic backbone protects against that by ensuring AI explanations are constrained by validated signals. The language can be conversational, but the content remains accountable.
+
+## This supports future coaching depth
+
+Another benefit of structured coaching is composability. Once deterministic fields exist at move level and key-moment level, they can be aggregated into higher-order insights:
+
+- recurring tactical misses,
+- phase-specific weaknesses,
+- opening-related risk patterns,
+- progression trends across recent games.
+
+AI can then summarize these aggregates in plain English, but the underlying metrics stay measurable and testable.
+
+## Trade-offs we accepted
+
+This approach does increase upfront work:
+
+- more schema and extraction logic,
+- more tests for signal quality,
+- slower path to flashy AI output.
+
+We accept those costs because they prevent a fragile product architecture where language quality masks analytical instability.
+
+## Practical implementation rule
+
+Our current rule of thumb is straightforward:
+
+- deterministic systems choose and score the moments,
+- AI systems explain those moments in player-friendly language.
+
+When those responsibilities are separated, both layers improve faster. Deterministic code can be hardened with tests and backfills; AI prompts can evolve for tone and clarity without redefining truth.
+
+## What this means for users now
+
+Users should feel two things:
+
+1. Feedback is grounded in real board logic.
+2. Explanations are readable enough to act on.
+
+The first comes from deterministic infrastructure. The second comes from narration. Building in this order keeps both promises honest.
+
+As we expand the AI layer, this foundation remains the guardrail: no explanation without evidence, no confidence without structure.

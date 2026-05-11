@@ -1,0 +1,124 @@
+---
+title: "Building a Recruiter-Readable Full-Stack Product"
+summary: "How I’m shaping Chess Coach Journal to demonstrate end-to-end product engineering, not just isolated features."
+publishedAt: "2026-05-09"
+tags:
+  - full-stack
+  - execution
+  - recruiting
+status: "published"
+---
+
+Most portfolio projects show features. Fewer show decision quality. This project is intentionally designed to make engineering judgment visible to recruiters and technical interviewers.
+
+Chess Coach Journal is a full-stack product focused on one outcome: help players improve by turning game analysis into teachable feedback. The project stack is straightforward on paper (Next.js frontend, Laravel API, queue workers, engine analysis), but the value is in how trade-offs are handled across boundaries.
+
+This post describes how I’m treating the build as both a user-facing product and a readable execution case study.
+
+## I optimize for complete loops, not isolated screens
+
+A common portfolio trap is polished UI disconnected from backend reality. I avoid that by prioritizing complete vertical slices:
+
+- import or sync games,
+- process analysis asynchronously,
+- render clear coaching output,
+- expose status and recovery paths.
+
+That end-to-end loop reveals practical engineering capability more clearly than a collection of disconnected demos.
+
+## Product scope is intentionally constrained
+
+Chess software can sprawl quickly into social, opening prep, puzzles, multiplayer, and content layers. This project deliberately avoids that early breadth.
+
+The focus stays on one job:
+
+- identify key mistakes,
+- explain them in plain language,
+- track recurring weaknesses over time.
+
+Constraining scope does two things recruiters care about:
+
+- it demonstrates prioritization discipline,
+- and it makes architectural decisions easier to evaluate.
+
+## Architecture decisions are written down, not implied
+
+I keep planning docs current and treat them as implementation tools, not static documentation. That creates a visible chain from product intent to code changes:
+
+- what problem was observed,
+- what alternatives were considered,
+- which direction was chosen,
+- what remains open.
+
+For reviewers, this makes the project legible. They can see that decisions are not random commits; they are tied to operating goals like latency, reliability, and user trust.
+
+## Async work is treated as a product concern
+
+Background jobs are not just infrastructure details. They shape user experience directly.
+
+In this project, queue behavior is exposed through explicit game states and actionable UI. Users can see whether a game is pending, queued, analysed, or failed, and can trigger analysis when needed.
+
+That avoids the “black box processing” feeling common in MVPs where data appears eventually with no clear model.
+
+From a recruiting perspective, this shows system thinking: backend status modeling, API contract design, and frontend interaction patterns aligned around the same state machine.
+
+## Quality strategy: deterministic core, AI as narration layer
+
+Another intentional signal is quality posture. Rather than making LLM output the source of truth, the system produces deterministic coaching data first, then narrates it.
+
+This communicates a practical approach to AI integration:
+
+- keep core logic testable,
+- reduce hallucination risk,
+- use AI where language adds value.
+
+It also demonstrates awareness of operational constraints like caching, idempotency, and graceful fallbacks.
+
+## Observability and tests are part of the story
+
+Recruiters and hiring managers often look for evidence beyond “it works on my machine.” I treat tests and operational checks as first-class outputs:
+
+- endpoint behavior is validated with feature tests,
+- queue-triggered flows get targeted integration coverage,
+- build-time checks guard content and route generation.
+
+That does not mean overengineering every path. It means critical flows are protected where breakage would hurt users most.
+
+## Why public engineering notes matter
+
+The dev blog itself is not a side project bolted onto the product. It is a communication layer for technical decision-making.
+
+Each post captures:
+
+- the user or system problem,
+- the selected implementation strategy,
+- trade-offs accepted,
+- and what this unlocks next.
+
+This gives recruiters a high-signal way to evaluate both technical skill and product reasoning without needing a live walkthrough first.
+
+## Trade-offs I consciously accept
+
+I’m not trying to maximize every metric at once. Current deliberate trade-offs include:
+
+- choosing simple, readable architecture over abstracted complexity,
+- postponing CMS and growth features in favor of core reliability,
+- shipping small increments that preserve momentum and testability.
+
+These are not temporary shortcuts; they are sequencing decisions aligned with product stage.
+
+## What success looks like for this portfolio
+
+For users, success is clear coaching from real games.
+
+For recruiters, success is seeing end-to-end ownership:
+
+- product scoping,
+- architecture decisions,
+- backend and frontend implementation,
+- operational thinking,
+- and clear technical communication.
+
+That combination is what I want this project to demonstrate. Not just that I can build features, but that I can shape a product system from idea to reliable execution.
+
+As the project grows, the same principle stays in place: each new feature should improve user outcomes and improve the clarity of the engineering story.

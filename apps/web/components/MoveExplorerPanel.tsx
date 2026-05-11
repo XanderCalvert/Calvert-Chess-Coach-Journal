@@ -245,7 +245,7 @@ export default function MoveExplorerPanel({ fen, onTryMove }: MoveExplorerPanelP
               <span style={{ ...monoStyle, color: 'var(--text)', fontWeight: 600, fontSize: 15 }}>{san}</span>
 
               {/* Confidence badge — shown in guided + full */}
-              {hintMode !== 'training' && (
+              {hintMode === 'full' && (
                 <span
                   style={{ ...monoStyle, fontSize: 11, color: confStyle.color }}
                 >
@@ -254,7 +254,7 @@ export default function MoveExplorerPanel({ fen, onTryMove }: MoveExplorerPanelP
               )}
 
               {/* Eval — hidden in training mode */}
-              {hintMode !== 'training' && (
+              {hintMode === 'full' && (
                 <>
                   <span style={{ ...monoStyle, color: 'var(--gold)', marginLeft: 'auto' }}>{evalStr}</span>
                   {deltaStr && (
@@ -264,7 +264,7 @@ export default function MoveExplorerPanel({ fen, onTryMove }: MoveExplorerPanelP
               )}
 
               {/* PV toggle — hidden in training mode */}
-              {hintMode !== 'training' && (
+              {hintMode === 'full' && (
                 <button
                   onClick={() => setExpandedPv(isExpanded ? null : candidate.rank)}
                   style={{
@@ -275,7 +275,7 @@ export default function MoveExplorerPanel({ fen, onTryMove }: MoveExplorerPanelP
                     cursor: 'pointer',
                     fontSize: 11,
                     padding: '0 4px',
-                    marginLeft: hintMode === 'training' ? 'auto' : undefined,
+                    marginLeft: undefined,
                   }}
                   aria-label={isExpanded ? 'Collapse PV' : 'Expand PV'}
                 >
@@ -294,14 +294,14 @@ export default function MoveExplorerPanel({ fen, onTryMove }: MoveExplorerPanelP
                   cursor: 'pointer',
                   fontSize: 11,
                   padding: '2px 8px',
-                  marginLeft: hintMode === 'training' ? 'auto' : undefined,
+                  marginLeft: hintMode === 'guided' ? 'auto' : undefined,
                 }}
               >
                 Try
               </button>
             </div>
 
-            {isExpanded && candidate.pv.length > 0 && hintMode !== 'training' && (
+            {isExpanded && candidate.pv.length > 0 && hintMode === 'full' && (
               <div style={{ ...monoStyle, color: 'var(--text-muted)', fontSize: 11, marginTop: 6, paddingLeft: 20 }}>
                 {candidate.pv.join(' ')}
               </div>

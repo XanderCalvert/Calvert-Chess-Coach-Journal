@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { FOOTER } from "@/lib/homepage-data";
 
 export default function Footer() {
@@ -12,12 +13,21 @@ export default function Footer() {
       >
         {FOOTER.logo}
       </span>
-      <span
-        className="text-[10px] tracking-[0.08em]"
-        style={{ fontFamily: "var(--font-dm-mono)", color: "rgba(232,224,208,0.2)" }}
-      >
-        {FOOTER.note}
-      </span>
+      <div className="flex items-center gap-4">
+        <Link
+          href={FOOTER.devBlog.href}
+          className="text-[10px] tracking-[0.08em] hover:underline"
+          style={{ fontFamily: "var(--font-dm-mono)", color: "rgba(232,224,208,0.35)" }}
+        >
+          {FOOTER.devBlog.label}
+        </Link>
+        <span
+          className="text-[10px] tracking-[0.08em]"
+          style={{ fontFamily: "var(--font-dm-mono)", color: "rgba(232,224,208,0.2)" }}
+        >
+          {FOOTER.note}
+        </span>
+      </div>
     </footer>
   );
 }
