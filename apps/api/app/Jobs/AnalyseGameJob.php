@@ -10,6 +10,9 @@ use App\Models\EngineAnalysis;
 use App\Models\Game;
 use App\Models\KeyMoment;
 use App\Models\MistakeTag;
+use App\Models\MoveTacticalEvent;
+use App\Models\MoveThreatEvent;
+use App\Jobs\ComputeWeaknessProfileJob;
 use App\Services\BoardAnalysisService;
 use App\Services\CoachingTemplateService;
 use App\Services\FenParserService;
@@ -26,6 +29,15 @@ class AnalyseGameJob implements ShouldQueue
     use Queueable;
 
     public int $tries = 3;
+
+    private const MOTIF_SEVERITY = [
+        'forced_mate_present'    => 'critical',
+        'hanging_piece'          => 'major',
+        'engine_prefers_capture' => 'major',
+        'possible_fork'          => 'minor',
+        'possible_pin'           => 'minor',
+        'possible_skewer'        => 'minor',
+    ];
 
     /** @var list<int> */
     public array $backoff = [60, 300];
@@ -59,6 +71,13 @@ class AnalyseGameJob implements ShouldQueue
         $counts     = ['blunder' => 0, 'mistake' => 0, 'inaccuracy' => 0];
         $userColour = $game->user_colour?->value;
         $depth      = config('services.stockfish.depth');
+
+        // Delete any existing event rows so re-analysis is idempotent.
+        $moveIds = $game->moves->pluck('id')->all();
+        MoveTacticalEvent::whereIn('move_id', $moveIds)->delete();
+        MoveThreatEvent::where('game_id', $game->id)->delete();
+
+        $prevMove = null;
 
         foreach ($game->moves as $move) {
             $before = $stockfish->analyse($move->fen_before);
@@ -95,10 +114,17 @@ class AnalyseGameJob implements ShouldQueue
             $threatData = $threatDetector->analyse($move->fen_before, $move->fen_after, $move->uci, $before, $after);
             $riskNote  = $templateService->buildRiskNote($classification, $themes, $threatData['tactical_flags'], $threatData['threat_awareness']);
 
+            $movePhase = match (true) {
+                $move->move_number <= 30 => GamePhase::Opening,    // ply ≤ 30 ≈ full-move 15
+                $move->move_number <= 70 => GamePhase::Middlegame, // ply ≤ 70 ≈ full-move 35
+                default                  => GamePhase::Endgame,
+            };
+
             $move->update([
                 'cp_score'         => $scoreBefore,
                 'cp_loss'          => $cpLoss,
                 'classification'   => $classification,
+                'game_phase'       => $movePhase,
                 'themes'           => $themes,
                 'tactical_flags'   => $threatData['tactical_flags'],
                 'threat_awareness' => $threatData['threat_awareness'],
@@ -106,7 +132,35 @@ class AnalyseGameJob implements ShouldQueue
                 'coaching_version' => 1,
             ]);
 
+            foreach ($threatData['tactical_flags'] as $motif) {
+                MoveTacticalEvent::create([
+                    'move_id'          => $move->id,
+                    'motif'            => $motif,
+                    'severity'         => self::MOTIF_SEVERITY[$motif] ?? 'minor',
+                    'confidence'       => $threatData['threat_awareness']['confidence'],
+                    'evidence_json'    => ['flags_before' => $threatData['tactical_flags']],
+                    'detector_version' => '1.0',
+                ]);
+            }
+
+            $awareness = $threatData['threat_awareness'];
+            if (! empty($awareness['threats_before'])) {
+                MoveThreatEvent::create([
+                    'game_id'               => $game->id,
+                    'threat_source_move_id' => $prevMove?->id,
+                    'response_move_id'      => $move->id,
+                    'threat_type'           => $awareness['threats_before'][0] ?? 'unknown',
+                    'threat_level'          => self::MOTIF_SEVERITY[$awareness['threats_before'][0] ?? ''] ?? 'minor',
+                    'response_status'       => $awareness['response'],
+                    'confidence'            => $awareness['confidence'],
+                    'evidence_json'         => $awareness,
+                    'detector_version'      => '1.0',
+                ]);
+            }
+
             logger()->debug("AnalyseGameJob: move {$move->move_number} {$move->san} — cp_loss={$cpLoss} class={$classification->value}");
+
+            $prevMove = $move;
         }
 
         $this->selectKeyMoments($game);
@@ -122,6 +176,10 @@ class AnalyseGameJob implements ShouldQueue
         ]);
 
         logger()->info("AnalyseGameJob: analysed game {$this->gameId} — accuracy={$accuracy}%");
+
+        if ($game->connected_account_id) {
+            ComputeWeaknessProfileJob::dispatch($game->connected_account_id)->afterCommit();
+        }
     }
 
     public function failed(Throwable $e): void

@@ -27,12 +27,14 @@ Route::prefix('v1')->group(function () {
     // Public — profile reads by chess.com username.
     Route::get('/connected-accounts/by-username/{platform}/{username}/games', [ConnectedAccountController::class, 'gamesByUsername']);
     Route::get('/connected-accounts/by-username/{platform}/{username}/stats', [ConnectedAccountController::class, 'statsByUsername']);
+    Route::get('/connected-accounts/by-username/{platform}/{username}/weakness-profile', [ConnectedAccountController::class, 'weaknessProfile']);
     Route::get('/connected-accounts/by-username/{platform}/{username}', [ConnectedAccountController::class, 'showByUsername']);
 
     // Private — all game and account management routes require auth.
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('/games', [GameController::class, 'index']);
         Route::post('/games', [GameController::class, 'store']);
+        Route::post('/games/reanalyse-completed', [GameController::class, 'reanalyseCompleted']);
         Route::get('/games/{id}', [GameController::class, 'show']);
         Route::post('/games/{id}/analyse', [GameController::class, 'analyse']);
 

@@ -573,4 +573,44 @@ class ConnectedAccountController extends Controller
             'sync_status'         => $account->sync_status->value,
         ];
     }
+
+    // Intentionally unauthenticated — powers the public /u/[username] profile page.
+    public function weaknessProfile(string $platform, string $username): JsonResponse
+    {
+        $account = ConnectedAccount::where('platform', $platform)
+            ->where('normalised_username', strtolower($username))
+            ->first();
+
+        if (! $account) {
+            return response()->json(['message' => 'Account not found.'], 404);
+        }
+
+        $profile = $account->latestWeaknessProfile;
+
+        if (! $profile) {
+            return response()->json(['message' => 'No weakness profile computed yet.'], 404);
+        }
+
+        $sufficientData = $profile->analysed_games_count >= 3;
+
+        return response()->json([
+            'state'   => $sufficientData ? 'ready' : 'insufficient_data',
+            'profile' => [
+                'computed_at'           => $profile->computed_at->toIso8601String(),
+                'profile_version'       => $profile->profile_version,
+                'window_size'           => $profile->window_size,
+                'analysed_games_count'  => $profile->analysed_games_count,
+                'computed_from_game_id' => $profile->computed_from_game_id,
+                'computed_to_game_id'   => $profile->computed_to_game_id,
+                'weakest_phase'         => $profile->weakest_phase,
+                'top_motif'             => $profile->top_motif,
+                'threat_response_rate'  => $profile->threat_response_rate,
+                'phase_breakdown'       => $profile->phase_breakdown,
+                'opening_breakdown'     => $profile->opening_breakdown,
+                'motif_frequencies'     => $profile->motif_frequencies,
+                'threat_response_by_phase' => $profile->threat_response_by_phase,
+                'summary_json'          => $profile->summary_json,
+            ],
+        ]);
+    }
 }

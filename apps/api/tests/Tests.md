@@ -179,6 +179,32 @@ Seeds a development user, submits a representative PGN-derived payload, and vali
 | `test_command_dispatches_sync_force_jobs_for_specific_game_ids` | `chess:reanalyse --game_id=...` dispatches forced sync analysis for each unique requested game ID. |
 | `test_command_with_all_dispatches_for_every_game` | `chess:reanalyse --all` dispatches forced sync analysis for every game in the database. |
 
+**File:** [`Feature/AnalyseEndpointTest.php`](Feature/AnalyseEndpointTest.php)
+
+| Test | What it verifies |
+|------|------------------|
+| `test_returns_202_and_queues_job_for_pending_game` | `POST /api/v1/games/{id}/analyse` queues `AnalyseGameJob` and sets status to `queued`. |
+| `test_sets_analysis_requested_at_timestamp` | `analysis_requested_at` is set when analysis is accepted. |
+| `test_returns_409_for_queued_game` | Duplicate queue while `queued` returns `409`. |
+| `test_returns_409_for_analysing_game` | Duplicate queue while `analysing` returns `409`. |
+| `test_returns_409_for_analysed_game` | Normal re-request when already `analysed` returns `409`. |
+| `test_requeues_failed_game` | Failed games can be re-queued on the normal path. |
+| `test_app_debug_true_and_force_requeues_analysed_game_with_force_flag` | With `APP_DEBUG` true and `?force=1`, an already-analysed game re-queues with `AnalyseGameJob` `force=true`. |
+| `test_app_debug_true_force_returns_409_when_already_queued` | Debug force refuses while status is `queued`. |
+| `test_force_query_does_not_bypass_analysed_when_app_debug_false` | `force=1` is ignored for analysed games when `APP_DEBUG` is false. |
+| `test_debug_force_does_not_consume_analysis_quota` | Debug force re-analyse does not increment `analysis_quota_used` (even at quota cap). |
+| `test_returns_404_for_another_users_game` | Cross-user game IDs return `404`. |
+
+**File:** [`Feature/ReanalyseCompletedGamesEndpointTest.php`](Feature/ReanalyseCompletedGamesEndpointTest.php)
+
+| Test | What it verifies |
+|------|------------------|
+| `test_queues_only_analysed_games_with_force_jobs` | `POST /api/v1/games/reanalyse-completed` queues `AnalyseGameJob` with `force=true` only for `analysed` games; pending games are untouched. |
+| `test_returns_200_when_no_analysed_games` | Endpoint returns `200` with `queued: 0` when nothing is eligible. |
+| `test_returns_422_when_quota_blocks_all` | When quota is exhausted, no jobs are pushed and response is `422`. |
+| `test_partial_queue_when_quota_insufficient` | Newest-first ordering allows partial batch when quota covers only some completed games. |
+| `test_app_debug_true_skips_quota_and_queues_all_eligible` | With `APP_DEBUG` true, bulk re-analyse queues every eligible game without incrementing `analysis_quota_used`. |
+
 ---
 
 ## Feature — share-code generation and migration safeguards

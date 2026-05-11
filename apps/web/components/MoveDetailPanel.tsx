@@ -131,6 +131,27 @@ export default function MoveDetailPanel({ move, isBookMove = false, openingLabel
         </p>
       )}
 
+      {/* Best move suggestion — hidden in training mode, only shown when a better move existed */}
+      {hintMode !== 'training' && move.best_move_san && move.cp_loss != null && move.cp_loss >= 20 && (
+        <div
+          className="rounded p-3 flex flex-col gap-1.5"
+          style={{ background: 'rgba(147,197,253,0.06)', border: '1px solid rgba(147,197,253,0.15)' }}
+        >
+          <p className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+            Best move:{' '}
+            <span style={{ color: '#93c5fd', fontFamily: 'var(--font-dm-mono)', fontSize: 14 }}>
+              {move.best_move_san}
+            </span>
+          </p>
+          {move.best_line && move.best_line.length > 1 && (
+            <p className="text-xs" style={{ color: 'var(--text-faint)', fontFamily: 'var(--font-dm-mono)', lineHeight: 1.6 }}>
+              {move.best_line.slice(0, 6).join(' ')}
+              {move.best_line.length > 6 ? ' …' : ''}
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Coaching sections — guided and full analysis only */}
       {hintMode !== 'training' && (
         <>

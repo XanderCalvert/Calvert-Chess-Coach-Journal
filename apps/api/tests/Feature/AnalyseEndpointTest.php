@@ -8,6 +8,7 @@ use App\Models\Game;
 use App\Models\User;
 use Database\Seeders\DevUserSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
@@ -109,6 +110,60 @@ class AnalyseEndpointTest extends TestCase
 
         $game->refresh();
         $this->assertSame(AnalysisStatus::Queued, $game->analysis_status);
+    }
+
+    public function test_app_debug_true_and_force_requeues_analysed_game_with_force_flag(): void
+    {
+        Config::set('app.debug', true);
+        Queue::fake();
+        $game = $this->createGame(['analysis_status' => AnalysisStatus::Analysed]);
+
+        $this->postJson("/api/v1/games/{$game->id}/analyse?force=1")
+            ->assertStatus(202)
+            ->assertJsonFragment(['message' => 'Analysis re-queued (debug force).']);
+
+        Queue::assertPushed(AnalyseGameJob::class, fn (AnalyseGameJob $job) => $job->gameId === $game->id && $job->force === true);
+
+        $game->refresh();
+        $this->assertSame(AnalysisStatus::Queued, $game->analysis_status);
+    }
+
+    public function test_app_debug_true_force_returns_409_when_already_queued(): void
+    {
+        Config::set('app.debug', true);
+        Queue::fake();
+        $game = $this->createGame(['analysis_status' => AnalysisStatus::Queued]);
+
+        $this->postJson("/api/v1/games/{$game->id}/analyse?force=1")->assertStatus(409);
+        Queue::assertNothingPushed();
+    }
+
+    public function test_force_query_does_not_bypass_analysed_when_app_debug_false(): void
+    {
+        Config::set('app.debug', false);
+        Queue::fake();
+        $game = $this->createGame(['analysis_status' => AnalysisStatus::Analysed]);
+
+        $this->postJson("/api/v1/games/{$game->id}/analyse?force=1")->assertStatus(409);
+        Queue::assertNothingPushed();
+    }
+
+    public function test_debug_force_does_not_consume_analysis_quota(): void
+    {
+        Config::set('app.debug', true);
+        config(['chess.free_monthly_analysis_quota' => 10]);
+        Queue::fake();
+        $this->user->update([
+            'subscription_tier'   => 'free',
+            'analysis_quota_used' => 10,
+            'quota_period_start'  => now()->startOfMonth()->toDateString(),
+        ]);
+        $game = $this->createGame(['analysis_status' => AnalysisStatus::Analysed]);
+
+        $this->postJson("/api/v1/games/{$game->id}/analyse?force=1")->assertStatus(202);
+
+        $this->user->refresh();
+        $this->assertSame(10, $this->user->analysis_quota_used);
     }
 
     public function test_returns_404_for_another_users_game(): void

@@ -96,4 +96,9 @@ class Game extends Model
     {
         return $this->hasMany(ManualNote::class);
     }
+
+    public function threatEvents(): HasMany
+    {
+        return $this->hasMany(MoveThreatEvent::class);
+    }
 }

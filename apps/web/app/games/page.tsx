@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import Nav from '@/components/Nav'
 
 interface ConnectedAccount {
@@ -65,7 +66,13 @@ const STATUS_STYLES: Record<string, { label: string; color: string }> = {
 
 const PAGE_SIZE = 20
 
+const SYNC_POLL_MAX_TICKS = 90
+const SYNC_POLL_MS = 2000
+
 export default function GamesPage() {
+  const router = useRouter()
+  const syncPollsRef = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map())
+
   const [accounts, setAccounts] = useState<ConnectedAccount[]>([])
   const [games, setGames] = useState<GameSummary[]>([])
   const [loading, setLoading] = useState(true)
@@ -77,6 +84,127 @@ export default function GamesPage() {
   const [analysingIds, setAnalysingIds] = useState<Set<string>>(new Set())
   const [analyseErrors, setAnalyseErrors] = useState<Record<string, string>>({})
   const [page, setPage] = useState(1)
+  const gamesRef = useRef<GameSummary[]>([])
+  gamesRef.current = games
+
+  const clearAccountSyncPoll = (accountId: string) => {
+    const t = syncPollsRef.current.get(accountId)
+    if (t) {
+      clearInterval(t)
+      syncPollsRef.current.delete(accountId)
+    }
+  }
+
+  useEffect(() => {
+    return () => {
+      for (const t of syncPollsRef.current.values()) {
+        clearInterval(t)
+      }
+      syncPollsRef.current.clear()
+    }
+  }, [])
+
+  const startPostSyncWatch = useCallback(
+    (account: ConnectedAccount, baselineIds: Set<string>) => {
+      clearAccountSyncPoll(account.id)
+      let attempts = 0
+      let navigated = false
+      let tickRunning = false
+
+      const finish = () => {
+        clearAccountSyncPoll(account.id)
+        setSyncingIds(prev => {
+          const next = new Set(prev)
+          next.delete(account.id)
+          return next
+        })
+      }
+
+      const tick = async () => {
+        if (!syncPollsRef.current.has(account.id) || navigated || tickRunning) {
+          return
+        }
+        tickRunning = true
+        attempts += 1
+        try {
+          if (attempts > SYNC_POLL_MAX_TICKS) {
+            if (!navigated) {
+              setSyncMessages(prev => ({
+                ...prev,
+                [account.id]:
+                  (prev[account.id] ? `${prev[account.id]} ` : '') +
+                  'Stopped waiting for new games (timeout).',
+              }))
+            }
+            finish()
+            return
+          }
+          try {
+            const [gamesRes, accountsRes] = await Promise.all([
+              fetch('/api/games'),
+              fetch('/api/connected-accounts'),
+            ])
+            if (!gamesRes.ok || !accountsRes.ok) {
+              return
+            }
+            const gamesPayload = await gamesRes.json()
+            const accountsPayload = await accountsRes.json()
+            const nextGames: GameSummary[] = gamesPayload.data ?? gamesPayload
+            const nextAccounts: ConnectedAccount[] = accountsPayload.data ?? []
+
+            setGames(nextGames)
+            setAccounts(nextAccounts)
+            if (gamesPayload.quota) {
+              setQuota(gamesPayload.quota)
+            }
+
+            if (!syncPollsRef.current.has(account.id)) {
+              return
+            }
+
+            const forAccount = nextGames.filter(g => g.connected_account_id === account.id)
+            const newOnes = forAccount.filter(g => !baselineIds.has(g.id))
+            if (newOnes.length > 0) {
+              const newest = [...newOnes].sort((a, b) => {
+                const ta = a.played_at ? Date.parse(a.played_at) : 0
+                const tb = b.played_at ? Date.parse(b.played_at) : 0
+                if (tb !== ta) {
+                  return tb - ta
+                }
+                return b.id.localeCompare(a.id)
+              })[0]
+              navigated = true
+              router.push(`/games/${newest.id}/analysis`)
+              finish()
+              return
+            }
+
+            const acct = nextAccounts.find(a => a.id === account.id)
+            if (acct && acct.sync_status !== 'syncing') {
+              if (!navigated) {
+                setSyncMessages(prev => ({
+                  ...prev,
+                  [account.id]: 'Sync finished. No new games in this run.',
+                }))
+              }
+              finish()
+            }
+          } catch {
+            /* next tick */
+          }
+        } finally {
+          tickRunning = false
+        }
+      }
+
+      const intervalId = setInterval(() => {
+        void tick()
+      }, SYNC_POLL_MS)
+      syncPollsRef.current.set(account.id, intervalId)
+      void tick()
+    },
+    [router],
+  )
 
   useEffect(() => {
     async function load() {
@@ -115,13 +243,17 @@ export default function GamesPage() {
         { method: 'POST' },
       )
       if (res.status === 202) {
+        const baselineIds = new Set(
+          gamesRef.current.filter(g => g.connected_account_id === account.id).map(g => g.id),
+        )
         setSyncMessages(prev => ({
           ...prev,
-          [account.id]: 'Sync started. New games will appear shortly.',
+          [account.id]: 'Sync started. Opening the newest new game when it arrives…',
         }))
         setAccounts(prev =>
           prev.map(a => a.id === account.id ? { ...a, sync_status: 'syncing' } : a)
         )
+        startPostSyncWatch(account, baselineIds)
       } else if (res.status === 409) {
         setSyncMessages(prev => ({ ...prev, [account.id]: 'Already syncing.' }))
       } else {
@@ -144,13 +276,17 @@ export default function GamesPage() {
         { method: 'POST' },
       )
       if (res.status === 202) {
+        const baselineIds = new Set(
+          gamesRef.current.filter(g => g.connected_account_id === account.id).map(g => g.id),
+        )
         setSyncMessages(prev => ({
           ...prev,
-          [account.id]: 'Full sync started. This may take a while for large histories.',
+          [account.id]: 'Full sync started. Opening the newest new game when it arrives…',
         }))
         setAccounts(prev =>
           prev.map(a => a.id === account.id ? { ...a, sync_status: 'syncing' } : a)
         )
+        startPostSyncWatch(account, baselineIds)
       } else if (res.status === 409) {
         setSyncMessages(prev => ({ ...prev, [account.id]: 'Already syncing.' }))
         setSyncingIds(prev => { const s = new Set(prev); s.delete(account.id); return s })

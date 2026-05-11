@@ -67,7 +67,7 @@ class GameController extends Controller
     public function show(string $id): JsonResponse
     {
         $game = Game::with([
-            'moves'       => fn ($q) => $q->orderBy('move_number'),
+            'moves'       => fn ($q) => $q->orderBy('move_number')->with('engineAnalysis'),
             'keyMoments'  => fn ($q) => $q->orderBy('rank')->with('move.engineAnalysis'),
         ])->forUser(auth()->id())->findOrFail($id);
 
@@ -77,7 +77,7 @@ class GameController extends Controller
     public function showByShareCode(string $code): JsonResponse
     {
         $game = Game::with([
-            'moves'      => fn ($q) => $q->orderBy('move_number'),
+            'moves'      => fn ($q) => $q->orderBy('move_number')->with('engineAnalysis'),
             'keyMoments' => fn ($q) => $q->orderBy('rank')->with('move.engineAnalysis'),
         ])
             ->where('share_code', $code)
@@ -86,11 +86,27 @@ class GameController extends Controller
         return response()->json($this->formatGameResponse($game));
     }
 
-    public function analyse(string $id): JsonResponse
+    public function analyse(Request $request, string $id): JsonResponse
     {
         $game = Game::forUser(auth()->id())->findOrFail($id);
 
-        if (in_array($game->analysis_status, [AnalysisStatus::Queued, AnalysisStatus::Analysing, AnalysisStatus::Analysed])) {
+        $debugForce = $request->boolean('force') && config('app.debug');
+
+        if ($debugForce) {
+            if (in_array($game->analysis_status, [AnalysisStatus::Queued, AnalysisStatus::Analysing], true)) {
+                return response()->json(['message' => 'Analysis already in progress. Wait until it finishes before forcing a new run.'], 409);
+            }
+
+            $game->update([
+                'analysis_status'       => AnalysisStatus::Queued,
+                'analysis_requested_at' => now(),
+            ]);
+            AnalyseGameJob::dispatch($game->id, force: true)->afterCommit();
+
+            return response()->json(['message' => 'Analysis re-queued (debug force).'], 202);
+        }
+
+        if (in_array($game->analysis_status, [AnalysisStatus::Queued, AnalysisStatus::Analysing, AnalysisStatus::Analysed], true)) {
             return response()->json(['message' => 'Analysis already in progress or complete.'], 409);
         }
 
@@ -130,6 +146,99 @@ class GameController extends Controller
         }
 
         return response()->json(['message' => 'Analysis queued.'], 202);
+    }
+
+    /**
+     * Re-queue Stockfish for games that already finished analysis (`analysed` only).
+     * Pending, queued, analysing, and failed games are unchanged (use per-game Analyse / Retry on those).
+     */
+    public function reanalyseCompleted(): JsonResponse
+    {
+        $batchCap = 200;
+        $bypassQuota = config('app.debug');
+
+        $payload = DB::transaction(function () use ($batchCap, $bypassQuota): array {
+            $user = User::whereKey(auth()->id())->lockForUpdate()->firstOrFail();
+            $user->resetPeriodIfRolled();
+
+            $limit = $user->quotaLimit();
+            $games = Game::forUser($user->id)
+                ->where('analysis_status', AnalysisStatus::Analysed)
+                ->orderByDesc('played_at')
+                ->limit($batchCap)
+                ->get();
+
+            $eligible  = $games->count();
+            $queued    = 0;
+            $remaining = $bypassQuota
+                ? PHP_INT_MAX
+                : ($limit === null ? PHP_INT_MAX : max(0, $limit - $user->analysis_quota_used));
+
+            foreach ($games as $game) {
+                if (! $bypassQuota && $remaining <= 0) {
+                    break;
+                }
+                $game->update([
+                    'analysis_status'       => AnalysisStatus::Queued,
+                    'analysis_requested_at' => now(),
+                ]);
+                AnalyseGameJob::dispatch($game->id, force: true)->afterCommit();
+                if (! $bypassQuota && $limit !== null) {
+                    $user->analysis_quota_used++;
+                    $remaining--;
+                }
+                $queued++;
+            }
+
+            if ($queued > 0) {
+                $user->save();
+            }
+
+            return [
+                'eligible'           => $eligible,
+                'queued'             => $queued,
+                'blocked_by_quota'   => $bypassQuota ? 0 : max(0, $eligible - $queued),
+                'quota_used'         => $user->analysis_quota_used,
+                'quota_limit'        => $limit,
+                'quota_bypassed'     => $bypassQuota,
+            ];
+        });
+
+        if ($payload['eligible'] === 0) {
+            return response()->json([
+                'message'  => 'No completed games to re-analyse.',
+                'queued'   => 0,
+                'eligible' => 0,
+            ], 200);
+        }
+
+        if ($payload['queued'] === 0 && ! $payload['quota_bypassed']) {
+            return response()->json([
+                'message'            => 'Monthly analysis quota exceeded; no games were queued.',
+                'queued'             => 0,
+                'eligible'           => $payload['eligible'],
+                'blocked_by_quota'   => $payload['blocked_by_quota'],
+                'quota_used'         => $payload['quota_used'],
+                'quota_limit'        => $payload['quota_limit'],
+                'quota_bypassed'     => false,
+            ], 422);
+        }
+
+        $message = $payload['quota_bypassed']
+            ? "Queued {$payload['queued']} completed game(s) for re-analysis (APP_DEBUG: quota not applied)."
+            : ($payload['queued'] === $payload['eligible']
+                ? "Queued {$payload['queued']} completed game(s) for re-analysis."
+                : "Queued {$payload['queued']} of {$payload['eligible']} completed game(s); the rest hit your monthly analysis limit.");
+
+        return response()->json([
+            'message'            => $message,
+            'queued'             => $payload['queued'],
+            'eligible'           => $payload['eligible'],
+            'blocked_by_quota'   => $payload['blocked_by_quota'],
+            'quota_used'         => $payload['quota_used'],
+            'quota_limit'        => $payload['quota_limit'],
+            'quota_bypassed'     => $payload['quota_bypassed'],
+        ], 202);
     }
 
     public function store(Request $request): JsonResponse
@@ -238,10 +347,14 @@ class GameController extends Controller
                 'cp_score'         => $m->cp_score,
                 'cp_loss'          => $m->cp_loss,
                 'classification'   => $m->classification?->value,
+                'game_phase'       => $m->game_phase?->value,
                 'themes'           => $m->themes ?? [],
                 'tactical_flags'   => $m->tactical_flags ?? [],
                 'threat_awareness' => $m->threat_awareness,
                 'risk_note'        => $m->risk_note,
+                'best_move_san'    => $m->engineAnalysis?->best_move_san,
+                'best_move_uci'    => $m->engineAnalysis?->best_move_uci,
+                'best_line'        => $m->engineAnalysis?->best_line ?? [],
             ]),
         ];
     }

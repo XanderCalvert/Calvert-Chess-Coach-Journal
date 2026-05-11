@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use App\Enums\GamePhase;
 use App\Enums\MoveClassification;
 use App\Enums\PlayerColour;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Move extends Model
@@ -45,6 +47,7 @@ class Move extends Model
         return [
             'colour'           => PlayerColour::class,
             'classification'   => MoveClassification::class,
+            'game_phase'       => GamePhase::class,
             'themes'           => 'array',
             'tactical_flags'   => 'array',
             'threat_awareness' => 'array',
@@ -64,5 +67,20 @@ class Move extends Model
     public function keyMoment(): HasOne
     {
         return $this->hasOne(KeyMoment::class);
+    }
+
+    public function tacticalEvents(): HasMany
+    {
+        return $this->hasMany(MoveTacticalEvent::class);
+    }
+
+    public function threatEventsAsSource(): HasMany
+    {
+        return $this->hasMany(MoveThreatEvent::class, 'threat_source_move_id');
+    }
+
+    public function threatEventsAsResponse(): HasMany
+    {
+        return $this->hasMany(MoveThreatEvent::class, 'response_move_id');
     }
 }

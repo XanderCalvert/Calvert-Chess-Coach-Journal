@@ -40,6 +40,10 @@ export interface Move {
   tactical_flags: string[]
   threat_awareness: ThreatAwareness | null
   risk_note: string | null
+  best_move_san: string | null
+  best_move_uci: string | null
+  best_line: string[]
+  game_phase: 'opening' | 'middlegame' | 'endgame' | null
 }
 
 export interface KeyMoment {
@@ -305,7 +309,13 @@ export default function GameAnalysisView(props: Props) {
   )
 }
 
-function GameAnalysisViewInner({ game, initialPly, onPlyChange, onRequestAnalysis, analyseError }: Props) {
+function GameAnalysisViewInner({
+  game,
+  initialPly,
+  onPlyChange,
+  onRequestAnalysis,
+  analyseError,
+}: Props) {
   const moves = game.moves
   const resolvedOpeningName = resolveOpeningName(game.opening_name, game.eco_code)
   const hasKnownOpening = Boolean(resolvedOpeningName && resolvedOpeningName.toLowerCase() !== 'unknown')
@@ -539,6 +549,7 @@ function GameAnalysisViewInner({ game, initialPly, onPlyChange, onRequestAnalysi
           <span>This game has not been analysed yet.</span>
           {onRequestAnalysis && (
             <button
+              type="button"
               onClick={onRequestAnalysis}
               style={{ ...btnBase, background: 'rgba(201,168,76,0.18)', color: 'var(--gold)', border: '1px solid rgba(201,168,76,0.45)', whiteSpace: 'nowrap' }}
             >
@@ -558,6 +569,7 @@ function GameAnalysisViewInner({ game, initialPly, onPlyChange, onRequestAnalysi
           <span>Analysis failed.</span>
           {onRequestAnalysis && (
             <button
+              type="button"
               onClick={onRequestAnalysis}
               style={{ ...btnBase, background: 'rgba(220,60,60,0.12)', color: 'var(--red)', border: '1px solid rgba(220,60,60,0.40)', whiteSpace: 'nowrap' }}
             >

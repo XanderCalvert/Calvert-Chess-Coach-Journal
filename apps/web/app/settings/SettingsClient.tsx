@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, FormEvent, useEffect } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { AuthUser, ExplanationDepth } from '@/lib/auth-context'
 import { useAuth } from '@/lib/auth-context'
@@ -13,6 +14,14 @@ interface ConnectedAccount {
   rapid_rating: number | null
   blitz_rating: number | null
   bullet_rating: number | null
+}
+
+interface GameOption {
+  id: string
+  white_player: string
+  black_player: string
+  played_at: string | null
+  analysis_status: string
 }
 
 const PLATFORM_LABEL: Record<string, string> = {
@@ -63,6 +72,17 @@ export default function SettingsClient({ user }: { user: AuthUser }) {
   const [removingId, setRemovingId] = useState<string | null>(null)
   const [removeError, setRemoveError] = useState<string | null>(null)
 
+  const isDev = process.env.NODE_ENV === 'development'
+  const [settingsGames, setSettingsGames] = useState<GameOption[]>([])
+  const [settingsGamesLoading, setSettingsGamesLoading] = useState(true)
+  const [devGameId, setDevGameId] = useState('')
+  const [devReanalyseBusy, setDevReanalyseBusy] = useState(false)
+  const [devReanalyseMessage, setDevReanalyseMessage] = useState<string | null>(null)
+  const [reanalyseCompletedBusy, setReanalyseCompletedBusy] = useState(false)
+  const [reanalyseCompletedMessage, setReanalyseCompletedMessage] = useState<string | null>(null)
+
+  const analysedGameCount = settingsGames.filter(g => g.analysis_status === 'analysed').length
+
   const memberSince = formatShortDate(user.created_at)
   const explanation =
     user.explanation_depth && EXPLANATION_LABEL[user.explanation_depth]
@@ -75,6 +95,26 @@ export default function SettingsClient({ user }: { user: AuthUser }) {
       .then(data => setAccounts(data.data ?? []))
       .finally(() => setLoadingAccounts(false))
   }, [])
+
+  useEffect(() => {
+    setSettingsGamesLoading(true)
+    fetch('/api/games')
+      .then(r => (r.ok ? r.json() : null))
+      .then(data => {
+        const list = (data?.data ?? data) as GameOption[] | undefined
+        if (!Array.isArray(list)) return
+        const sorted = [...list].sort((a, b) => {
+          const ta = a.played_at ? Date.parse(a.played_at) : 0
+          const tb = b.played_at ? Date.parse(b.played_at) : 0
+          return tb - ta
+        })
+        setSettingsGames(sorted)
+        if (isDev) {
+          setDevGameId(prev => prev || sorted[0]?.id || '')
+        }
+      })
+      .finally(() => setSettingsGamesLoading(false))
+  }, [isDev])
 
   async function copyAccountId() {
     try {
@@ -402,6 +442,224 @@ export default function SettingsClient({ user }: { user: AuthUser }) {
           </button>
         )}
       </section>
+
+      <section className="flex flex-col gap-4">
+        <h2 className="text-xs uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
+          Analysis
+        </h2>
+        <div
+          className="rounded-lg p-6 flex flex-col gap-4"
+          style={{ background: 'var(--surface)', border: surfaceBorder }}
+        >
+          <p className="text-sm m-0 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+            Re-run the engine on games that are already marked{' '}
+            <span style={{ color: 'var(--text)' }}>analysed</span>. Newly
+            synced games that have never been analysed are skipped — queue those from{' '}
+            <Link href="/games" className="underline" style={{ color: 'var(--gold)' }}>
+              My Games
+            </Link>
+            .
+          </p>
+          <p className="text-xs m-0 leading-relaxed" style={{ color: 'var(--text-faint)' }}>
+            Newest games first, up to 200 per run. Each re-analysis counts toward your monthly analysis quota (same as
+            clicking Analyse), unless the API is running with{' '}
+            <code className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+              APP_DEBUG=true
+            </code>{' '}
+            in <code className="text-[11px]" style={{ color: 'var(--text-muted)' }}>.env</code> — then quota is not
+            applied (local development only). Failed or in-progress games are not included; retry those individually from
+            My Games.
+          </p>
+          {settingsGamesLoading ? (
+            <p className="text-xs m-0" style={{ color: 'var(--text-faint)' }}>
+              Loading…
+            </p>
+          ) : (
+            <p className="text-xs m-0" style={{ color: 'var(--text-muted)' }}>
+              <span className="font-medium" style={{ color: 'var(--text)' }}>
+                {analysedGameCount}
+              </span>{' '}
+              completed game{analysedGameCount === 1 ? '' : 's'} eligible to re-analyse.
+            </p>
+          )}
+          <button
+            type="button"
+            disabled={reanalyseCompletedBusy || settingsGamesLoading || analysedGameCount === 0}
+            onClick={async () => {
+              setReanalyseCompletedMessage(null)
+              setReanalyseCompletedBusy(true)
+              try {
+                const res = await fetch('/api/games/reanalyse-completed', { method: 'POST' })
+                const body = await res.json().catch(() => ({}))
+                const msg =
+                  typeof body.message === 'string'
+                    ? body.message
+                    : res.ok
+                      ? 'Request completed.'
+                      : `Request failed (${res.status}).`
+                setReanalyseCompletedMessage(msg)
+                if (res.status === 202 || res.status === 200) {
+                  const gamesRes = await fetch('/api/games')
+                  if (gamesRes.ok) {
+                    const data = await gamesRes.json()
+                    const list = (data?.data ?? data) as GameOption[] | undefined
+                    if (Array.isArray(list)) {
+                      const sorted = [...list].sort((a, b) => {
+                        const ta = a.played_at ? Date.parse(a.played_at) : 0
+                        const tb = b.played_at ? Date.parse(b.played_at) : 0
+                        return tb - ta
+                      })
+                      setSettingsGames(sorted)
+                    }
+                  }
+                }
+              } catch {
+                setReanalyseCompletedMessage('Network error.')
+              } finally {
+                setReanalyseCompletedBusy(false)
+              }
+            }}
+            className="self-start text-sm font-medium px-4 py-2 rounded disabled:opacity-50"
+            style={{
+              background: 'rgba(201,168,76,0.12)',
+              color: 'var(--gold)',
+              border: '1px solid rgba(201,168,76,0.35)',
+              cursor: reanalyseCompletedBusy ? 'wait' : 'pointer',
+            }}
+          >
+            {reanalyseCompletedBusy ? 'Queuing…' : 'Re-analyse completed games'}
+          </button>
+          {reanalyseCompletedMessage && (
+            <p className="text-xs m-0" style={{ color: 'var(--text-muted)' }}>
+              {reanalyseCompletedMessage}
+            </p>
+          )}
+        </div>
+      </section>
+
+      {isDev && (
+        <section className="flex flex-col gap-4">
+          <h2 className="text-xs uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
+            Developer
+          </h2>
+          <div
+            className="rounded-lg p-6 flex flex-col gap-4"
+            style={{ background: 'rgba(100,100,180,0.06)', border: '1px solid rgba(160,160,220,0.22)' }}
+          >
+            <p className="text-sm m-0 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+              Re-queue Stockfish for a game even when analysis is already complete. Requires{' '}
+              <code className="text-xs" style={{ color: 'var(--text)' }}>
+                APP_DEBUG=true
+              </code>{' '}
+              on the API. Does not consume monthly analysis quota. Run{' '}
+              <code className="text-xs" style={{ color: 'var(--text)' }}>
+                php artisan queue:work
+              </code>{' '}
+              so the job runs.
+            </p>
+            {settingsGamesLoading ? (
+              <p className="text-xs m-0" style={{ color: 'var(--text-faint)' }}>
+                Loading games…
+              </p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                <label className="text-xs m-0" style={{ color: 'var(--text-muted)' }}>
+                  Game
+                </label>
+                <select
+                  value={settingsGames.some(g => g.id === devGameId) ? devGameId : ''}
+                  onChange={e => {
+                    const v = e.target.value
+                    if (v) setDevGameId(v)
+                  }}
+                  className="rounded px-3 py-2 text-sm max-w-full"
+                  style={{
+                    background: 'var(--surface)',
+                    color: 'var(--text)',
+                    border: inputBorder,
+                  }}
+                >
+                  <option value="" style={{ background: '#181510', color: '#e8e0d0' }}>
+                    {settingsGames.length === 0 ? 'No games yet' : '— Choose from list —'}
+                  </option>
+                  {settingsGames.map(g => (
+                    <option key={g.id} value={g.id} style={{ background: '#181510', color: '#e8e0d0' }}>
+                      {g.played_at ?? '—'} · {g.white_player} vs {g.black_player} · {g.analysis_status}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs m-0" style={{ color: 'var(--text-muted)' }}>
+                Or paste game UUID
+              </label>
+              <input
+                type="text"
+                value={devGameId}
+                onChange={e => setDevGameId(e.target.value.trim())}
+                placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                className="rounded px-3 py-2 text-sm font-mono placeholder:text-[rgba(232,224,208,0.35)]"
+                style={{
+                  background: 'rgba(15,13,11,0.5)',
+                  color: 'var(--text)',
+                  border: inputBorder,
+                }}
+              />
+            </div>
+            <button
+              type="button"
+              disabled={devReanalyseBusy || !devGameId}
+              onClick={async () => {
+                setDevReanalyseMessage(null)
+                setDevReanalyseBusy(true)
+                try {
+                  const res = await fetch(`/api/games/${devGameId}/analyse?force=1`, { method: 'POST' })
+                  const body = await res.json().catch(() => ({}))
+                  if (res.status === 202) {
+                    setDevReanalyseMessage(
+                      typeof body.message === 'string' ? body.message : 'Analysis re-queued. Check the game page for progress.',
+                    )
+                  } else {
+                    setDevReanalyseMessage(
+                      typeof body.message === 'string'
+                        ? body.message
+                        : `Request failed (${res.status}). Is APP_DEBUG enabled on the API?`,
+                    )
+                  }
+                } catch {
+                  setDevReanalyseMessage('Network error.')
+                } finally {
+                  setDevReanalyseBusy(false)
+                }
+              }}
+              className="self-start text-sm font-medium px-4 py-2 rounded disabled:opacity-50"
+              style={{
+                background: 'rgba(160,160,220,0.2)',
+                color: 'var(--text)',
+                border: '1px solid rgba(160,160,220,0.35)',
+                cursor: devReanalyseBusy ? 'wait' : 'pointer',
+              }}
+            >
+              {devReanalyseBusy ? 'Queuing…' : 'Debug: Re-analyse game (force)'}
+            </button>
+            {devReanalyseMessage && (
+              <p className="text-xs m-0 flex flex-col gap-2" style={{ color: 'var(--text-muted)' }}>
+                <span>{devReanalyseMessage}</span>
+                {devReanalyseMessage.includes('re-queued') && devGameId && (
+                  <Link
+                    href={`/games/${devGameId}/analysis`}
+                    className="text-xs font-medium w-fit"
+                    style={{ color: 'var(--gold)' }}
+                  >
+                    Open game analysis →
+                  </Link>
+                )}
+              </p>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* Session */}
       <section className="flex flex-col gap-4">

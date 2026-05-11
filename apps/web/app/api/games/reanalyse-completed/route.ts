@@ -1,18 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { getLaravelHeaders, getLaravelBaseUrl, clearAuthCookie } from '@/lib/apiClient'
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id } = await params
+export async function POST() {
   const headers = await getLaravelHeaders()
-  const force = request.nextUrl.searchParams.get('force')
-  const query = force ? `?force=${encodeURIComponent(force)}` : ''
 
   let res: Response
   try {
-    res = await fetch(`${getLaravelBaseUrl()}/api/v1/games/${id}/analyse${query}`, {
+    res = await fetch(`${getLaravelBaseUrl()}/api/v1/games/reanalyse-completed`, {
       method: 'POST',
       headers,
     })

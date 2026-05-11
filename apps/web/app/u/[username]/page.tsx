@@ -79,6 +79,60 @@ interface RecentGame {
   blunder_count: number
 }
 
+interface PhaseBreakdown {
+  move_count: number
+  blunders: number
+  mistakes: number
+  inaccuracies: number
+  avg_cp_loss: number | null
+  error_rate: number
+  top_motifs: string[]
+  threat_response_rate: number | null
+}
+
+interface OpeningRow {
+  eco_code: string
+  opening_name: string
+  games: number
+  avg_accuracy: number | null
+  blunders: number
+  mistakes: number
+  inaccuracies: number
+  avg_cp_loss: number | null
+  weakness_score: number
+}
+
+interface MotifRow {
+  motif: string
+  severity: 'critical' | 'major' | 'minor'
+  count: number
+  affected_games: number
+  frequency_rate: number
+  phases: Record<string, number>
+  dominant_phase: string | null
+  score: number
+}
+
+interface WeaknessProfile {
+  computed_at: string
+  profile_version: string
+  window_size: number
+  analysed_games_count: number
+  weakest_phase: string | null
+  top_motif: string | null
+  threat_response_rate: string | null
+  phase_breakdown: Record<string, PhaseBreakdown>
+  opening_breakdown: OpeningRow[]
+  motif_frequencies: MotifRow[]
+  threat_response_by_phase: Record<string, number>
+  summary_json: Record<string, unknown>
+}
+
+interface WeaknessProfileResponse {
+  state: 'ready' | 'insufficient_data'
+  profile: WeaknessProfile
+}
+
 interface ProfileStats {
   games_analysed: number
   wins: number
@@ -238,6 +292,54 @@ function isGameTypeFilter(value: string | null | undefined): value is Exclude<Ga
   return value === 'bullet' || value === 'blitz' || value === 'rapid' || value === 'daily'
 }
 
+const PHASE_LABEL: Record<string, string> = {
+  opening: 'Opening',
+  middlegame: 'Middlegame',
+  endgame: 'Endgame',
+}
+
+const MOTIF_LABEL: Record<string, string> = {
+  forced_mate_present:    'Forced mate missed',
+  hanging_piece:          'Hanging piece',
+  engine_prefers_capture: 'Missed capture',
+  possible_fork:          'Possible fork',
+  possible_pin:           'Possible pin',
+  possible_skewer:        'Possible skewer',
+}
+
+const SEVERITY_DOT: Record<string, string> = {
+  critical: '#f87171',
+  major:    '#fb923c',
+  minor:    '#c9a84c',
+}
+
+function errorRateColor(rate: number): string {
+  if (rate >= 0.5) return '#f87171'
+  if (rate >= 0.25) return '#fb923c'
+  return '#4ade80'
+}
+
+function threatRateColor(pct: number): string {
+  if (pct >= 70) return '#4ade80'
+  if (pct >= 45) return '#c9a84c'
+  return '#f87171'
+}
+
+function weaknessScoreColor(score: number): string {
+  if (score >= 4) return '#f87171'
+  if (score >= 2) return '#fb923c'
+  return '#4ade80'
+}
+
+function timeAgo(isoString: string): string {
+  const diff = Date.now() - new Date(isoString).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  return `${Math.floor(hrs / 24)}d ago`
+}
+
 export default function ProfilePage() {
   const { username } = useParams<{ username: string }>()
   const router = useRouter()
@@ -254,6 +356,8 @@ export default function ProfilePage() {
 
   const [stats, setStats] = useState<ProfileStats | null>(null)
   const [statsLoading, setStatsLoading] = useState(true)
+  const [weaknessProfile, setWeaknessProfile] = useState<WeaknessProfileResponse | null>(null)
+  const [weaknessLoading, setWeaknessLoading] = useState(true)
   /** `null` until first bootstrap fetch picks default from API `recommended_game_type`. */
   const [gameTypeFilter, setGameTypeFilter] = useState<GameTypeFilter | null>(null)
   const [timeframeDays, setTimeframeDays] = useState<TimeframeDays>(90)
@@ -279,6 +383,8 @@ export default function ProfilePage() {
     setTimeframeDays(90)
     setAnalysedCountsByType(null)
     setStats(null)
+    setWeaknessProfile(null)
+    setWeaknessLoading(true)
 
     fetch(`/api/connected-accounts/chesscom/${username}`).then(async accountRes => {
       if (accountRes.status === 404) { setNotFound(true); return }
@@ -291,6 +397,18 @@ export default function ProfilePage() {
     }).catch(err => setError(err instanceof Error ? err.message : 'Network error'))
       .finally(() => setLoading(false))
   }, [username])
+
+  useEffect(() => {
+    if (!username || notFound) return
+    setWeaknessLoading(true)
+    fetch(`/api/connected-accounts/chesscom/${username}/weakness-profile`)
+      .then(async res => {
+        if (!res.ok) { setWeaknessProfile(null); return }
+        setWeaknessProfile(await res.json())
+      })
+      .catch(() => setWeaknessProfile(null))
+      .finally(() => setWeaknessLoading(false))
+  }, [username, notFound])
 
   // Bootstrap default game-type filter from analysed counts (one fetch with `all`).
   useEffect(() => {
@@ -839,6 +957,169 @@ export default function ProfilePage() {
                 </table>
               </div>
             </div>
+          )}
+        </section>
+
+        {/* Weakness profile section */}
+        <section className="mb-10">
+          <h2 className="text-base font-semibold mb-4" style={{ fontFamily: 'var(--font-playfair)', color: 'var(--text)' }}>
+            Weakness profile
+          </h2>
+
+          {weaknessLoading ? (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="p-4 rounded" style={{ background: 'var(--surface)', border: '1px solid rgba(232,224,208,0.10)', minHeight: 120 }}>
+                  <div className="h-2.5 w-28 rounded mb-3" style={{ background: 'rgba(232,224,208,0.08)' }} />
+                  <div className="h-2 w-full rounded mb-2" style={{ background: 'rgba(232,224,208,0.06)' }} />
+                  <div className="h-2 w-4/5 rounded" style={{ background: 'rgba(232,224,208,0.06)' }} />
+                </div>
+              ))}
+            </div>
+          ) : !weaknessProfile ? (
+            <div className="p-6 rounded text-sm text-center" style={{ background: 'var(--surface)', border: '1px solid rgba(232,224,208,0.10)', color: 'var(--text-muted)' }}>
+              No weakness profile computed yet. Analyse some games to see patterns.
+            </div>
+          ) : weaknessProfile.state === 'insufficient_data' ? (
+            <div className="p-6 rounded" style={{ background: 'var(--surface)', border: '1px solid rgba(232,224,208,0.10)' }}>
+              <p className="text-sm font-medium mb-1" style={{ color: 'var(--text)' }}>Not enough data yet</p>
+              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                {weaknessProfile.profile.analysed_games_count} / 3 games analysed. Analyse at least 3 games to unlock your weakness profile.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {/* Card 1: Phase weakness */}
+                <div className="p-4 rounded" style={{ background: 'var(--surface)', border: '1px solid rgba(232,224,208,0.10)' }}>
+                  <div className="text-xs uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>Phase weakness</div>
+                  {Object.entries(weaknessProfile.profile.phase_breakdown).map(([phase, data]) => {
+                    const pct = Math.min(100, data.error_rate * 100)
+                    const color = errorRateColor(data.error_rate)
+                    const isWeakest = phase === weaknessProfile.profile.weakest_phase
+                    return (
+                      <div key={phase} className="mb-3 last:mb-0">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs" style={{ color: isWeakest ? 'var(--text)' : 'var(--text-muted)', fontWeight: isWeakest ? 600 : 400 }}>
+                            {PHASE_LABEL[phase] ?? phase}
+                            {isWeakest && <span className="ml-1.5 text-[10px]" style={{ color }}>▲ weakest</span>}
+                          </span>
+                          <span className="text-xs" style={{ fontFamily: 'var(--font-dm-mono)', color }}>
+                            {data.error_rate.toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(232,224,208,0.08)' }}>
+                          <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: color }} />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* Card 2: Recurring tactical patterns */}
+                <div className="p-4 rounded" style={{ background: 'var(--surface)', border: '1px solid rgba(232,224,208,0.10)' }}>
+                  <div className="text-xs uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>Recurring patterns</div>
+                  {weaknessProfile.profile.motif_frequencies.length === 0 ? (
+                    <p className="text-xs" style={{ color: 'var(--text-faint)' }}>No recurring patterns detected.</p>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      {weaknessProfile.profile.motif_frequencies.slice(0, 5).map(m => (
+                        <div key={m.motif} className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span
+                              style={{
+                                width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+                                background: SEVERITY_DOT[m.severity] ?? 'var(--text-faint)',
+                              }}
+                            />
+                            <span className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>
+                              {MOTIF_LABEL[m.motif] ?? m.motif}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            {m.dominant_phase && (
+                              <span className="text-[10px]" style={{ color: 'var(--text-faint)' }}>
+                                {PHASE_LABEL[m.dominant_phase] ?? m.dominant_phase}
+                              </span>
+                            )}
+                            <span className="text-xs" style={{ fontFamily: 'var(--font-dm-mono)', color: 'var(--text-muted)' }}>
+                              {m.affected_games}g
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Card 3: Opening performance */}
+                <div className="p-4 rounded" style={{ background: 'var(--surface)', border: '1px solid rgba(232,224,208,0.10)' }}>
+                  <div className="text-xs uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>Opening performance</div>
+                  {weaknessProfile.profile.opening_breakdown.length === 0 ? (
+                    <p className="text-xs" style={{ color: 'var(--text-faint)' }}>Not enough games per opening (min 3).</p>
+                  ) : (
+                    <table className="w-full text-xs" style={{ borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr>
+                          {['Opening', 'Games', 'Score'].map(h => (
+                            <th key={h} className="text-left pb-1.5" style={{ color: 'var(--text-faint)', fontWeight: 400 }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {weaknessProfile.profile.opening_breakdown.slice(0, 5).map(row => (
+                          <tr key={row.eco_code}>
+                            <td className="py-1 pr-3" style={{ color: 'var(--text-muted)', maxWidth: 140 }}>
+                              <span className="block truncate">{row.opening_name}</span>
+                              <span style={{ color: 'var(--text-faint)', fontFamily: 'var(--font-dm-mono)' }}>{row.eco_code}</span>
+                            </td>
+                            <td className="py-1 pr-3" style={{ fontFamily: 'var(--font-dm-mono)', color: 'var(--text-muted)' }}>
+                              {row.games}
+                            </td>
+                            <td className="py-1 font-medium" style={{ fontFamily: 'var(--font-dm-mono)', color: weaknessScoreColor(row.weakness_score) }}>
+                              {row.weakness_score.toFixed(1)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+
+                {/* Card 4: Threat response rate */}
+                <div className="p-4 rounded" style={{ background: 'var(--surface)', border: '1px solid rgba(232,224,208,0.10)' }}>
+                  <div className="text-xs uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>Threat response</div>
+                  {weaknessProfile.profile.threat_response_rate == null && Object.keys(weaknessProfile.profile.threat_response_by_phase).length === 0 ? (
+                    <p className="text-xs" style={{ color: 'var(--text-faint)' }}>No threat data available.</p>
+                  ) : (
+                    <div className="flex flex-col gap-3">
+                      {weaknessProfile.profile.threat_response_rate != null && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Overall</span>
+                          <span className="text-sm font-medium" style={{ fontFamily: 'var(--font-dm-mono)', color: threatRateColor(Number(weaknessProfile.profile.threat_response_rate)) }}>
+                            {Number(weaknessProfile.profile.threat_response_rate).toFixed(1)}%
+                          </span>
+                        </div>
+                      )}
+                      {Object.entries(weaknessProfile.profile.threat_response_by_phase).map(([phase, pct]) => (
+                        <div key={phase} className="flex items-center justify-between">
+                          <span className="text-xs" style={{ color: 'var(--text-faint)' }}>{PHASE_LABEL[phase] ?? phase}</span>
+                          <span className="text-xs" style={{ fontFamily: 'var(--font-dm-mono)', color: threatRateColor(pct) }}>
+                            {pct.toFixed(1)}%
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Footer */}
+              <p className="mt-3 text-xs" style={{ color: 'var(--text-faint)' }}>
+                Based on last {weaknessProfile.profile.window_size} analysed games
+                {' · '}computed {timeAgo(weaknessProfile.profile.computed_at)}
+              </p>
+            </>
           )}
         </section>
 

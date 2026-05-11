@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class ConnectedAccount extends Model
 {
@@ -49,5 +50,15 @@ class ConnectedAccount extends Model
     public function games(): HasMany
     {
         return $this->hasMany(Game::class);
+    }
+
+    public function weaknessProfiles(): HasMany
+    {
+        return $this->hasMany(WeaknessProfile::class);
+    }
+
+    public function latestWeaknessProfile(): HasOne
+    {
+        return $this->hasOne(WeaknessProfile::class)->latestOfMany('computed_at');
     }
 }
