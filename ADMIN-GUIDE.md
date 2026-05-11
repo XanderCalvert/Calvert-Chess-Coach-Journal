@@ -82,6 +82,14 @@ You must pass either `--all` or at least one `--game_id`.
 
 > **Cost note:** `--all` will analyse *every* imported game including ones the user has never opened. Under the staged pipeline this is the operator's intentional override of the on-demand model. Prefer per-game runs in production.
 
+### `chess:compute-weakness-profiles`
+
+Recomputes stored **weakness profile** rows (aggregate phase / opening / motif summaries) from analysed games and normalized move events. Dispatches `ComputeWeaknessProfileJob` per account or for a single `--account=` UUID. Use after bulk backfills or when testing profile scoring changes.
+
+### `chess:backfill-move-events`
+
+Populates `move_tactical_events` and `move_threat_events` from existing move JSON (`tactical_flags`, `threat_awareness`) for games that were analysed before normalized tables existed.
+
 ---
 
 ## Related docs
