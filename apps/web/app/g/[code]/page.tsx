@@ -40,7 +40,7 @@ export default function SharePage() {
       const data: GameAnalysis = await res.json()
       if (!cancelled) {
         setGame(data)
-        setPolling(data.analysis_status === 'pending' || data.analysis_status === 'running')
+        setPolling(data.analysis_status === 'pending' || data.analysis_status === 'queued' || data.analysis_status === 'analysing')
       }
     }
 
@@ -67,7 +67,7 @@ export default function SharePage() {
         }
         const data: GameAnalysis = await res.json()
         setGame(data)
-        setPolling(data.analysis_status === 'pending' || data.analysis_status === 'running')
+        setPolling(data.analysis_status === 'pending' || data.analysis_status === 'queued' || data.analysis_status === 'analysing')
       })()
     }
     window.addEventListener('pageshow', onPageShow)
@@ -81,7 +81,7 @@ export default function SharePage() {
       if (!res.ok) return
       const data: GameAnalysis = await res.json()
       setGame(data)
-      if (data.analysis_status !== 'pending' && data.analysis_status !== 'running') {
+      if (data.analysis_status !== 'pending' && data.analysis_status !== 'queued' && data.analysis_status !== 'analysing') {
         setPolling(false)
       }
     }, 3000)

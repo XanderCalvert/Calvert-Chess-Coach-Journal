@@ -29,7 +29,7 @@ class QueueRecentAnalysisJob implements ShouldQueue
             ->get();
 
         foreach ($games as $game) {
-            $game->update(['analysis_status' => AnalysisStatus::Running]);
+            $game->update(['analysis_status' => AnalysisStatus::Queued]);
             AnalyseGameJob::dispatch($game->id)->afterCommit();
         }
 

@@ -71,11 +71,11 @@ class GameListTest extends TestCase
 
     public function test_analysis_status_is_string_value(): void
     {
-        $this->createGame(['analysis_status' => AnalysisStatus::Complete]);
+        $this->createGame(['analysis_status' => AnalysisStatus::Analysed]);
 
         $game = $this->getJson('/api/v1/games')->json('0');
 
-        $this->assertSame('complete', $game['analysis_status']);
+        $this->assertSame('analysed', $game['analysis_status']);
     }
 
     public function test_result_is_string_value(): void

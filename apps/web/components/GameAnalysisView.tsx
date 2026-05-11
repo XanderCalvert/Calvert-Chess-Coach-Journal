@@ -66,7 +66,7 @@ export interface GameAnalysis {
   eco_code: string
   opening_name: string
   move_count: number
-  analysis_status: 'pending' | 'running' | 'complete' | 'failed'
+  analysis_status: 'pending' | 'queued' | 'analysing' | 'analysed' | 'failed'
   accuracy_pct: string | null
   blunder_count: number | null
   mistake_count: number | null
@@ -389,7 +389,7 @@ function GameAnalysisViewInner({ game, initialPly, onPlyChange, onRequestAnalysi
     : null
 
   const boardOrientation = game.user_colour === 'black' ? 'black' : 'white'
-  const isPending = game.analysis_status === 'pending' || game.analysis_status === 'running'
+  const isPending = game.analysis_status === 'pending' || game.analysis_status === 'queued' || game.analysis_status === 'analysing'
 
   const goFirst   = useCallback(() => { setCurrentMoveIndex(-1); setExplorerFen(null) }, [])
   const goPrev    = useCallback(() => { setCurrentMoveIndex(i => Math.max(-1, i - 1)); setExplorerFen(null) }, [])
@@ -547,10 +547,10 @@ function GameAnalysisViewInner({ game, initialPly, onPlyChange, onRequestAnalysi
           )}
         </div>
       )}
-      {game.analysis_status === 'running' && (
+      {(game.analysis_status === 'queued' || game.analysis_status === 'analysing') && (
         <div className="mb-6 p-4 rounded text-sm flex items-center gap-3" style={{ background: 'rgba(201,168,76,0.10)', border: '1px solid rgba(201,168,76,0.25)', color: 'var(--gold)' }}>
           <span className="animate-pulse">●</span>
-          Analysis in progress — results will appear automatically.
+          {game.analysis_status === 'queued' ? 'Analysis queued — results will appear automatically.' : 'Analysis in progress — results will appear automatically.'}
         </div>
       )}
       {game.analysis_status === 'failed' && (
@@ -573,7 +573,7 @@ function GameAnalysisViewInner({ game, initialPly, onPlyChange, onRequestAnalysi
       )}
 
       {/* Stats */}
-      {game.analysis_status === 'complete' && (
+      {game.analysis_status === 'analysed' && (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
             <StatCard label="Accuracy"     value={game.accuracy_pct != null ? `${game.accuracy_pct}%` : '—'} color="var(--gold)" />

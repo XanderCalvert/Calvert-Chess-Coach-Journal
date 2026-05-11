@@ -39,12 +39,12 @@ class AnalyseGameJob implements ShouldQueue
     {
         $game = Game::with(['moves' => fn ($q) => $q->orderBy('move_number')->orderBy('colour')])->findOrFail($this->gameId);
 
-        if (! $this->force && $game->analysis_status === AnalysisStatus::Complete) {
-            logger()->info("AnalyseGameJob: game {$this->gameId} already complete, skipping");
+        if (! $this->force && $game->analysis_status === AnalysisStatus::Analysed) {
+            logger()->info("AnalyseGameJob: game {$this->gameId} already analysed, skipping");
             return;
         }
 
-        $game->update(['analysis_status' => AnalysisStatus::Running]);
+        $game->update(['analysis_status' => AnalysisStatus::Analysing]);
 
         logger()->info("AnalyseGameJob: starting analysis for game {$this->gameId} ({$game->moves->count()} moves)");
 
@@ -114,14 +114,14 @@ class AnalyseGameJob implements ShouldQueue
         $accuracy = $this->computeAccuracy($cpLosses);
 
         $game->update([
-            'analysis_status' => AnalysisStatus::Complete,
+            'analysis_status' => AnalysisStatus::Analysed,
             'accuracy_pct'    => $accuracy,
             'blunder_count'   => $counts['blunder'],
             'mistake_count'   => $counts['mistake'],
             'inaccuracy_count' => $counts['inaccuracy'],
         ]);
 
-        logger()->info("AnalyseGameJob: complete for game {$this->gameId} — accuracy={$accuracy}%");
+        logger()->info("AnalyseGameJob: analysed game {$this->gameId} — accuracy={$accuracy}%");
     }
 
     public function failed(Throwable $e): void

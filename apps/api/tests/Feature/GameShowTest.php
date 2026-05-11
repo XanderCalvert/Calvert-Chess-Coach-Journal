@@ -222,7 +222,7 @@ PGN;
 
     public function test_response_includes_key_moments_with_expected_shape(): void
     {
-        $game = $this->createGame(['share_code' => 'km000002', 'analysis_status' => 'complete']);
+        $game = $this->createGame(['share_code' => 'km000002', 'analysis_status' => 'analysed']);
 
         $move = Move::create([
             'game_id'     => $game->id,
@@ -268,7 +268,7 @@ PGN;
 
     public function test_key_moments_are_ordered_by_rank(): void
     {
-        $game = $this->createGame(['share_code' => 'km000003', 'analysis_status' => 'complete']);
+        $game = $this->createGame(['share_code' => 'km000003', 'analysis_status' => 'analysed']);
 
         $move1 = Move::create(['game_id' => $game->id, 'move_number' => 5,  'colour' => 'white', 'san' => 'e4', 'uci' => 'e2e4', 'fen_before' => 'a', 'fen_after' => 'b', 'cp_loss' => 400]);
         $move2 = Move::create(['game_id' => $game->id, 'move_number' => 10, 'colour' => 'black', 'san' => 'd5', 'uci' => 'd7d5', 'fen_before' => 'c', 'fen_after' => 'd', 'cp_loss' => 250]);

@@ -29,7 +29,7 @@ interface ProfileGame {
   eco_code: string
   opening_name: string
   move_count: number
-  analysis_status: 'pending' | 'running' | 'complete' | 'failed'
+  analysis_status: 'pending' | 'queued' | 'analysing' | 'analysed' | 'failed'
   accuracy_pct: string | null
   blunder_count: number | null
   mistake_count: number | null
@@ -120,10 +120,11 @@ const PLAYER_RESULT_COLOUR: Record<string, string> = {
 }
 
 const STATUS_STYLES: Record<string, { label: string; color: string }> = {
-  complete: { label: 'Complete',   color: '#4ade80' },
-  running:  { label: 'Analysing…', color: 'var(--gold)' },
-  pending:  { label: 'Queued',     color: 'var(--text-muted)' },
-  failed:   { label: 'Failed',     color: '#f87171' },
+  pending:   { label: 'Not analysed', color: 'var(--text-muted)' },
+  queued:    { label: 'Queued',       color: 'var(--gold)' },
+  analysing: { label: 'Analysing…',  color: 'var(--gold)' },
+  analysed:  { label: 'Complete',     color: '#4ade80' },
+  failed:    { label: 'Failed',       color: '#f87171' },
 }
 
 const SYNC_STATUS_STYLES: Record<string, { label: string; color: string }> = {
@@ -920,7 +921,7 @@ export default function ProfilePage() {
                             {g.move_count}
                           </td>
                           <td className="px-4 py-3 font-medium" style={{ color: 'var(--gold)', fontFamily: 'var(--font-dm-mono)' }}>
-                            {g.analysis_status === 'complete' && g.accuracy_pct != null ? `${g.accuracy_pct}%` : '—'}
+                            {g.analysis_status === 'analysed' && g.accuracy_pct != null ? `${g.accuracy_pct}%` : '—'}
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
                             <span className="text-xs" style={{ color: status.color }}>{status.label}</span>

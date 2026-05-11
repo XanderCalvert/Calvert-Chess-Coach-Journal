@@ -32,7 +32,7 @@ class ReanalyseGamesCommandTest extends TestCase
             'eco_code' => 'C20',
             'opening_name' => 'King Pawn Game',
             'move_count' => 1,
-            'analysis_status' => 'complete',
+            'analysis_status' => 'analysed',
             'imported_from' => 'paste',
             'share_code' => strtolower(substr(bin2hex(random_bytes(4)), 0, 8)),
         ], $overrides));

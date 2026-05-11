@@ -23,7 +23,7 @@ interface GameSummary {
   eco_code: string
   opening_name: string
   move_count: number
-  analysis_status: 'pending' | 'running' | 'complete' | 'failed'
+  analysis_status: 'pending' | 'queued' | 'analysing' | 'analysed' | 'failed'
   accuracy_pct: string | null
   blunder_count: number | null
   mistake_count: number | null
@@ -49,10 +49,11 @@ function userResultLabel(result: string, userColour: 'white' | 'black' | null): 
 }
 
 const STATUS_STYLES: Record<string, { label: string; color: string }> = {
-  complete: { label: 'Complete',   color: '#4ade80' },
-  running:  { label: 'Analysing…', color: 'var(--gold)' },
-  pending:  { label: 'Queued',     color: 'var(--text-muted)' },
-  failed:   { label: 'Failed',     color: '#f87171' },
+  pending:   { label: 'Not analysed', color: 'var(--text-muted)' },
+  queued:    { label: 'Queued',       color: 'var(--gold)' },
+  analysing: { label: 'Analysing…',  color: 'var(--gold)' },
+  analysed:  { label: 'Complete',     color: '#4ade80' },
+  failed:    { label: 'Failed',       color: '#f87171' },
 }
 
 const PAGE_SIZE = 20
@@ -124,7 +125,7 @@ export default function GamesPage() {
 
   async function handleAnalyse(gameId: string) {
     setAnalysingIds(prev => new Set(prev).add(gameId))
-    setGames(prev => prev.map(g => g.id === gameId ? { ...g, analysis_status: 'running' } : g))
+    setGames(prev => prev.map(g => g.id === gameId ? { ...g, analysis_status: 'queued' } : g))
     try {
       const res = await fetch(`/api/games/${gameId}/analyse`, { method: 'POST' })
       if (res.status !== 202 && res.status !== 409) {
@@ -217,7 +218,7 @@ export default function GamesPage() {
                 My Games
               </h1>
               {!loading && !error && (() => {
-                const analysedCount = filteredGames.filter(g => g.analysis_status === 'complete').length
+                const analysedCount = filteredGames.filter(g => g.analysis_status === 'analysed').length
                 const total = filteredGames.length
                 return (
                   <p className="text-sm" style={{ color: 'var(--text-muted)' }}>

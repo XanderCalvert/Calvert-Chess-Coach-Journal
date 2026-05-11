@@ -167,8 +167,8 @@ class ConnectedAccountController extends Controller
         $typeMeta = $this->analysedGameTypeMeta($account->id);
 
         $base = Game::where('connected_account_id', $account->id)
-            ->where('analysis_status', AnalysisStatus::Complete);
-        $matchingIds = $this->matchingGameIdsForType($account->id, $gameType, AnalysisStatus::Complete->value);
+            ->where('analysis_status', AnalysisStatus::Analysed);
+        $matchingIds = $this->matchingGameIdsForType($account->id, $gameType, AnalysisStatus::Analysed->value);
         if ($matchingIds !== null) {
             if ($matchingIds->isEmpty()) {
                 return response()->json(array_merge([
@@ -246,7 +246,7 @@ class ConnectedAccountController extends Controller
         $rawAvgCpl = DB::table('moves')
             ->join('games', 'moves.game_id', '=', 'games.id')
             ->where('games.connected_account_id', $account->id)
-            ->where('games.analysis_status', AnalysisStatus::Complete->value)
+            ->where('games.analysis_status', AnalysisStatus::Analysed->value)
             ->when($matchingIds !== null, fn ($query) => $query->whereIn('games.id', $matchingIds))
             ->when($cutoff !== null, fn ($query) => $query->where('games.played_at', '>=', $cutoff))
             ->whereColumn('moves.colour', 'games.user_colour')
@@ -261,7 +261,7 @@ class ConnectedAccountController extends Controller
                      ->whereNotNull('moves.cp_loss');
             })
             ->where('games.connected_account_id', $account->id)
-            ->where('games.analysis_status', AnalysisStatus::Complete->value)
+            ->where('games.analysis_status', AnalysisStatus::Analysed->value)
             ->when($matchingIds !== null, fn ($query) => $query->whereIn('games.id', $matchingIds))
             ->when($cutoff !== null, fn ($query) => $query->where('games.played_at', '>=', $cutoff))
             ->select('games.id', 'games.played_at', DB::raw('AVG(moves.cp_loss) as avg_cp_loss'))
@@ -448,7 +448,7 @@ class ConnectedAccountController extends Controller
     {
         $games = Game::query()
             ->where('connected_account_id', $accountId)
-            ->where('analysis_status', AnalysisStatus::Complete)
+            ->where('analysis_status', AnalysisStatus::Analysed)
             ->get(['time_control']);
 
         $counts = [

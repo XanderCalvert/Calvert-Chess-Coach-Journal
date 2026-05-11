@@ -73,11 +73,11 @@ class GameController extends Controller
     {
         $game = Game::forUser(auth()->id())->findOrFail($id);
 
-        if ($game->analysis_status === AnalysisStatus::Running || $game->analysis_status === AnalysisStatus::Complete) {
+        if (in_array($game->analysis_status, [AnalysisStatus::Queued, AnalysisStatus::Analysing, AnalysisStatus::Analysed])) {
             return response()->json(['message' => 'Analysis already in progress or complete.'], 409);
         }
 
-        $game->update(['analysis_status' => AnalysisStatus::Running]);
+        $game->update(['analysis_status' => AnalysisStatus::Queued, 'analysis_requested_at' => now()]);
 
         AnalyseGameJob::dispatch($game->id)->afterCommit();
 

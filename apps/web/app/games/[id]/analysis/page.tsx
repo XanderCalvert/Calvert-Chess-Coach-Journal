@@ -37,7 +37,7 @@ export default function AnalysisPage() {
       const data: GameAnalysis = await res.json()
       if (!cancelled) {
         setGame(data)
-        setPolling(data.analysis_status === 'pending' || data.analysis_status === 'running')
+        setPolling(data.analysis_status === 'pending' || data.analysis_status === 'queued' || data.analysis_status === 'analysing')
       }
     }
 
@@ -58,7 +58,7 @@ export default function AnalysisPage() {
         }
         const data: GameAnalysis = await res.json()
         setGame(data)
-        setPolling(data.analysis_status === 'pending' || data.analysis_status === 'running')
+        setPolling(data.analysis_status === 'pending' || data.analysis_status === 'queued' || data.analysis_status === 'analysing')
       })()
     }
     window.addEventListener('pageshow', onPageShow)
@@ -72,7 +72,7 @@ export default function AnalysisPage() {
       if (!res.ok) return
       const data: GameAnalysis = await res.json()
       setGame(data)
-      if (data.analysis_status !== 'pending' && data.analysis_status !== 'running') {
+      if (data.analysis_status !== 'pending' && data.analysis_status !== 'queued' && data.analysis_status !== 'analysing') {
         setPolling(false)
       }
     }, 3000)
@@ -83,7 +83,7 @@ export default function AnalysisPage() {
     setAnalyseError(null)
     const res = await fetch(`/api/games/${id}/analyse`, { method: 'POST' })
     if (res.status === 202) {
-      setGame(prev => prev ? { ...prev, analysis_status: 'running' } : prev)
+      setGame(prev => prev ? { ...prev, analysis_status: 'queued' } : prev)
       setPolling(true)
     } else if (res.status === 409) {
       // already running or complete — start polling to pick up the result

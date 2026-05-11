@@ -43,7 +43,7 @@ class ConnectedAccountStatsTest extends TestCase
             'opening_name'         => 'King Pawn Game',
             'eco_code'             => 'C20',
             'move_count'           => 2,
-            'analysis_status'      => 'complete',
+            'analysis_status'      => 'analysed',
             'imported_from'        => 'chesscom',
             'share_code'           => substr(md5(uniqid()), 0, 8),
             'blunder_count'        => 0,

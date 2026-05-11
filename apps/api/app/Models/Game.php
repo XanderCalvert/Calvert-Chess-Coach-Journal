@@ -35,6 +35,7 @@ class Game extends Model
         'inaccuracy_count',
         'summary_text',
         'analysis_status',
+        'analysis_requested_at',
         'imported_from',
         'external_id',
         'share_code',
@@ -51,7 +52,8 @@ class Game extends Model
     protected function casts(): array
     {
         return [
-            'played_at'       => 'datetime',
+            'played_at'              => 'datetime',
+            'analysis_requested_at'  => 'datetime',
             'result'          => GameResult::class,
             'user_colour'     => PlayerColour::class,
             'accuracy_pct'    => 'decimal:2',

@@ -80,7 +80,7 @@ class AnalyseGameJobTest extends TestCase
         $game->refresh();
         $move->refresh();
 
-        $this->assertSame('complete', $game->analysis_status->value);
+        $this->assertSame('analysed', $game->analysis_status->value);
         $this->assertSame(0, $game->blunder_count);
         $this->assertSame(0, $game->mistake_count);
         $this->assertSame(0, $game->inaccuracy_count);
@@ -110,10 +110,10 @@ class AnalyseGameJobTest extends TestCase
         $this->assertArrayHasKey('confidence', $move->threat_awareness);
     }
 
-    public function test_job_skips_complete_games_unless_forced(): void
+    public function test_job_skips_analysed_games_unless_forced(): void
     {
         $game = $this->createPendingGame();
-        $game->update(['analysis_status' => AnalysisStatus::Complete]);
+        $game->update(['analysis_status' => AnalysisStatus::Analysed]);
 
         $stockfish = \Mockery::mock('overload:App\Services\StockfishService');
         $stockfish->shouldNotReceive('analyse');
@@ -121,7 +121,7 @@ class AnalyseGameJobTest extends TestCase
         (new AnalyseGameJob($game->id))->handle();
 
         $game->refresh();
-        $this->assertSame('complete', $game->analysis_status->value);
+        $this->assertSame('analysed', $game->analysis_status->value);
     }
 
     public function test_failed_marks_game_as_failed(): void
