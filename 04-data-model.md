@@ -1,6 +1,6 @@
 # Chess Coach Journal — Data Model
 
-All tables use UUID primary keys. All data is scoped to the authenticated user.
+All tables use UUID primary keys. **Target:** data scoped to the authenticated user; **today** Chess.com–imported games may have `user_id` null while `connected_account_id` is set.
 
 ---
 
@@ -149,3 +149,34 @@ All tables use UUID primary keys. All data is scoped to the authenticated user.
 | `status` | enum | `active` \| `in_progress` \| `done` \| `dismissed` |
 | `created_at` | timestamp | |
 | `completed_at` | timestamp, nullable | |
+
+---
+
+## Connected accounts (implemented)
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | UUID PK | |
+| `user_id` | FK → Users, nullable | Optional link when auth exists |
+| `platform` | string | e.g. `chesscom` |
+| `username` | string | Display username |
+| `normalised_username` | string | Lowercase; unique with `platform` |
+| `external_id` | string, nullable | Reserved |
+| `profile_url` | string, nullable | |
+| `rapid_rating` | smallint, nullable | From Chess.com stats API |
+| `blitz_rating` | smallint, nullable | |
+| `bullet_rating` | smallint, nullable | |
+| `daily_rating` | smallint, nullable | |
+| `last_synced_at` | timestamp, nullable | |
+| `sync_status` | string | `never_synced` \| `syncing` \| `synced` \| `failed` |
+
+**Games** (additional columns in migrations): `connected_account_id`, `platform`, `share_code`, `time_control`, `rated`, opponent and rating fields, etc. See `2026_05_08_000006_add_profile_fields_to_games_table.php` and related migrations.
+
+---
+
+## Implementation status (May 2026)
+
+- [x] Schema + models for games, moves, engine analyses, key moments (table), mistake tags (seeded), manual notes, trend summaries (table)
+- [x] Connected accounts + Chess.com import metadata on games
+- [ ] Key moments + explanations populated end-to-end in UI for every analysed game
+- [ ] Trend summary rows driven by product “trends” page (profile uses **query-time** stats instead)

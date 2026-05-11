@@ -1,5 +1,7 @@
 # Chess Coach Journal — Architecture
 
+**As implemented (May 2026):** Next.js App Router + Laravel API + PostgreSQL; Laravel queues + Stockfish; Next **BFF** routes under `apps/web/app/api/...` proxying **`/api/v1/...`** on Laravel. Auth not wired. Trend **charts** on profile use a small Sparkline component (not necessarily Recharts).
+
 ## Stack
 
 ### Frontend

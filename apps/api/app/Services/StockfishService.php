@@ -108,6 +108,93 @@ class StockfishService
         ];
     }
 
+    /**
+     * Analyse a FEN position with MultiPV support.
+     *
+     * Returns an array keyed by rank (1-based), each entry:
+     * { rank, uci, cp (side-to-move), mate, pv }
+     * cp is from the side-to-move perspective; caller normalises to White-positive.
+     *
+     * @return array<int, array{rank: int, uci: string, cp: int|null, mate: int|null, pv: list<string>}>
+     */
+    public function analysePosition(string $fen, int $multipv, int $timeMs): array
+    {
+        $this->send("setoption name MultiPV value {$multipv}");
+        $this->send("position fen {$fen}");
+        $this->send("go movetime {$timeMs}");
+
+        // Track deepest complete line per multipv rank
+        $lines    = [];  // rank => ['depth' => int, 'uci' => string, 'cp' => int|null, 'mate' => int|null, 'pv' => list<string>]
+        $deadline = microtime(true) + ($timeMs / 1000) + $this->timeout;
+
+        while (microtime(true) < $deadline) {
+            $read   = [$this->stdout];
+            $write  = null;
+            $except = null;
+
+            $ready = stream_select($read, $write, $except, 0, 50_000);
+
+            if ($ready === false) {
+                break;
+            }
+
+            if ($ready === 0) {
+                continue;
+            }
+
+            $line = fgets($this->stdout);
+            if ($line === false) {
+                continue;
+            }
+
+            $line = trim($line);
+
+            if (str_starts_with($line, 'info depth') && str_contains($line, ' multipv ')) {
+                $depth = $this->parseDepth($line);
+                $rank  = $this->parseMultiPvRank($line);
+                $pv    = $this->parsePvFull($line);
+                $uci   = $pv[0] ?? '';
+
+                if ($uci === '' || $rank === 0) {
+                    continue;
+                }
+
+                // Keep deepest complete line for this rank
+                if (! isset($lines[$rank]) || $depth >= $lines[$rank]['depth']) {
+                    [$cp, $mate] = $this->parseCpAndMate($line);
+                    $lines[$rank] = [
+                        'depth' => $depth,
+                        'uci'   => $uci,
+                        'cp'    => $cp,
+                        'mate'  => $mate,
+                        'pv'    => $pv,
+                    ];
+                }
+            }
+
+            if (str_starts_with($line, 'bestmove')) {
+                break;
+            }
+        }
+
+        // Reset MultiPV back to 1 so existing analyse() calls are unaffected
+        $this->send('setoption name MultiPV value 1');
+
+        $result = [];
+        foreach ($lines as $rank => $data) {
+            $result[$rank] = [
+                'rank' => $rank,
+                'uci'  => $data['uci'],
+                'cp'   => $data['cp'],
+                'mate' => $data['mate'],
+                'pv'   => $data['pv'],
+            ];
+        }
+        ksort($result);
+
+        return array_values($result);
+    }
+
     private function send(string $command): void
     {
         fwrite($this->stdin, $command . "\n");
@@ -163,6 +250,35 @@ class StockfishService
     {
         if (preg_match('/ pv (.+)$/', $line, $m)) {
             return array_slice(explode(' ', trim($m[1])), 0, 4);
+        }
+        return [];
+    }
+
+    private function parseMultiPvRank(string $line): int
+    {
+        if (preg_match('/\bmultipv\s+(\d+)/', $line, $m)) {
+            return (int) $m[1];
+        }
+        return 0;
+    }
+
+    /** @return array{0: int|null, 1: int|null} [cp, mate] */
+    private function parseCpAndMate(string $line): array
+    {
+        if (preg_match('/score cp (-?\d+)/', $line, $m)) {
+            return [(int) $m[1], null];
+        }
+        if (preg_match('/score mate (-?\d+)/', $line, $m)) {
+            return [null, (int) $m[1]];
+        }
+        return [0, null];
+    }
+
+    /** @return list<string> */
+    private function parsePvFull(string $line): array
+    {
+        if (preg_match('/ pv (.+)$/', $line, $m)) {
+            return explode(' ', trim($m[1]));
         }
         return [];
     }

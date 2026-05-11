@@ -2,6 +2,8 @@
 
 Analysis is an asynchronous pipeline triggered when a user submits a game for import. It runs as a series of background jobs to avoid blocking the HTTP request.
 
+**Status (May 2026):** PGN parse → persist moves → `AnalyseGameJob` (Stockfish, CP loss, classifications, game counters, `analysis_status`) is **live**. Key-moment persistence, tagging, LLM explanations, and post-game summary jobs described below are **not fully wired** to match this doc end-to-end; see [09-build-roadmap.md](./09-build-roadmap.md).
+
 ---
 
 ## Step 1: PGN Parsing

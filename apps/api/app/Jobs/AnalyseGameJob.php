@@ -41,6 +41,7 @@ class AnalyseGameJob implements ShouldQueue
         $stockfish  = new StockfishService();
         $cpLosses   = [];
         $counts     = ['blunder' => 0, 'mistake' => 0, 'inaccuracy' => 0];
+        $userColour = $game->user_colour?->value;
         $depth      = config('services.stockfish.depth');
 
         foreach ($game->moves as $move) {
@@ -55,7 +56,7 @@ class AnalyseGameJob implements ShouldQueue
 
             $classification = $this->classify($cpLoss, $move->uci, $before['best_move']);
 
-            if (isset($counts[$classification->value])) {
+            if ($move->colour->value === $userColour && isset($counts[$classification->value])) {
                 $counts[$classification->value]++;
             }
 
@@ -109,9 +110,10 @@ class AnalyseGameJob implements ShouldQueue
         }
 
         return match (true) {
-            $cpLoss <= 20  => MoveClassification::Good,
-            $cpLoss <= 50  => MoveClassification::Inaccuracy,
-            $cpLoss <= 150 => MoveClassification::Mistake,
+            $cpLoss <= 30  => MoveClassification::Excellent,
+            $cpLoss <= 80  => MoveClassification::Good,
+            $cpLoss <= 140 => MoveClassification::Inaccuracy,
+            $cpLoss <= 300 => MoveClassification::Mistake,
             default        => MoveClassification::Blunder,
         };
     }
@@ -123,8 +125,10 @@ class AnalyseGameJob implements ShouldQueue
             return 0.0;
         }
 
-        $avg = array_sum($cpLosses) / count($cpLosses);
+        // Chess.com-style ACPL formula expects pawn units, not centipawns.
+        $avgCpLossInPawns = (array_sum($cpLosses) / count($cpLosses)) / 100.0;
+        $accuracy = 103.1668 * exp(-0.04354 * $avgCpLossInPawns) - 3.1669;
 
-        return round(103.1668 * exp(-0.04354 * $avg) - 3.1669, 2);
+        return round(max(0.0, min(100.0, $accuracy)), 2);
     }
 }

@@ -1,5 +1,7 @@
 # Chess Coach Journal — Explanation System
 
+**Status (May 2026):** Specification and prompt guidance only — **LLM explanation generation is not yet in the shipped user flow** (key-moment text remains empty / pending in normal use).
+
 ## Design Goals
 
 - Explanations must be **factually grounded** in the position — no hallucinated moves or pieces

@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\AnalysisStatus;
 use App\Enums\GameResult;
 use App\Enums\ImportSource;
+use App\Enums\Platform;
 use App\Enums\PlayerColour;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -35,6 +36,15 @@ class Game extends Model
         'analysis_status',
         'imported_from',
         'external_id',
+        'share_code',
+        'connected_account_id',
+        'platform',
+        'time_control',
+        'rated',
+        'user_rating_before',
+        'user_rating_after',
+        'opponent_username',
+        'opponent_rating',
     ];
 
     protected function casts(): array
@@ -46,12 +56,19 @@ class Game extends Model
             'accuracy_pct'    => 'decimal:2',
             'analysis_status' => AnalysisStatus::class,
             'imported_from'   => ImportSource::class,
+            'platform'        => Platform::class,
+            'rated'           => 'boolean',
         ];
     }
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function connectedAccount(): BelongsTo
+    {
+        return $this->belongsTo(ConnectedAccount::class);
     }
 
     public function moves(): HasMany

@@ -26,10 +26,9 @@ This document maps each PHPUnit test method to the behavior it protects. Tests l
 Deliberate gaps right now:
 
 - **End-to-end auth-protected API flows** - no authenticated profile or authorization matrix tests yet.
-- **Controller-level coverage beyond game import** - most assertions are model/data constraints plus one import endpoint.
 - **Performance and large-PGN stress cases** - import tests validate correctness, not throughput or limits.
-- **Error-body contract granularity** - most failing requests assert status code (`422`) but not detailed response error structure.
-- **Legacy scaffold tests** - example tests still exist and are not behavior-driving.
+- **Real Stockfish binary integration** - analysis job tests currently mock `StockfishService` for determinism.
+- **Command failure-path handling** - current command coverage asserts synchronous dispatch, not thrown-error output path.
 
 ## Base test case
 
@@ -56,6 +55,101 @@ Seeds a development user, submits a representative PGN-derived payload, and vali
 | `test_invalid_move_colour_returns_422` | Invalid move color enum is rejected. |
 | `test_invalid_uci_format_returns_422` | Invalid UCI move notation is rejected. |
 | `test_empty_moves_array_returns_422` | Empty move list is rejected. |
+| `test_dispatches_analyse_game_job_after_import` | Import dispatches the async analysis job with created game ID. |
+| `test_uses_defaults_when_optional_fields_are_missing` | Optional import fields fall back to intended defaults (`opening_name`, `eco_code`, `move_count`, status/source/colour, `share_code`). |
+| `test_missing_required_fields_returns_field_errors` | Validation response includes field-keyed errors for required top-level fields. |
+| `test_invalid_move_fields_return_field_errors` | Validation response includes nested move field errors (`moves.0.*`) for malformed move data. |
+
+---
+
+## Feature — `GET /api/v1/games/{id}` and share-code lookup
+
+**File:** [`Feature/GameShowTest.php`](Feature/GameShowTest.php)
+
+| Test | What it verifies |
+|------|------------------|
+| `test_show_returns_expected_contract_and_moves_ordered_by_move_number` | Game detail endpoint returns the full game/move payload contract and deterministic move ordering. |
+| `test_show_returns_404_for_unknown_uuid` | Unknown game ID returns `404`. |
+| `test_show_by_share_code_returns_same_game` | Share-code route resolves to the expected game payload. |
+| `test_show_by_share_code_includes_chess_com_source_url_when_present` | Chess.com-imported games expose a source URL for linking back to the original game page. |
+| `test_show_by_share_code_uses_link_header_not_site_label_for_chess_com_source_url` | Typical PGN has `[Site "Chess.com"]` before `[Link "https://…"]`; extraction must use the Link URL, not the site label. |
+| `test_show_by_share_code_returns_404_when_not_found` | Unknown share code returns `404`. |
+| `test_share_code_lookup_is_case_sensitive` | Share-code lookup behavior is documented as exact-match (case-sensitive). |
+
+---
+
+## Feature — connected account listing
+
+**File:** [`Feature/ConnectedAccountListTest.php`](Feature/ConnectedAccountListTest.php)
+
+| Test | What it verifies |
+|------|------------------|
+| `test_returns_paginated_payload_with_empty_data_when_no_accounts` | List endpoint returns a stable paginated contract with empty `data` and correct `meta` defaults. |
+| `test_returns_accounts_ordered_by_platform_then_username` | Accounts are returned in deterministic order (`platform`, then `username`). |
+
+---
+
+## Feature — connected account profile stats and filters
+
+**File:** [`Feature/ConnectedAccountStatsTest.php`](Feature/ConnectedAccountStatsTest.php)
+
+| Test | What it verifies |
+|------|------------------|
+| `test_returns_404_for_unknown_username` | Stats endpoint returns `404` for unknown connected-account usernames. |
+| `test_returns_zeroed_stats_when_no_analysed_games` | No complete games returns a stable zero/null stats contract, empty trend arrays, zero `analysed_counts_by_type`, and `recommended_game_type` null. |
+| `test_derives_win_loss_draw_from_board_result_and_user_colour` | W/D/L counters are computed from tracked-player perspective, not raw board winner only. |
+| `test_avg_cp_loss_uses_only_tracked_player_colour_moves` | Avg CPL excludes opponent moves and uses only tracked-player move rows. |
+| `test_avg_cp_loss_excludes_games_with_no_analysed_moves` | Games without analysed move CPL do not drag average toward zero. |
+| `test_rating_trend_uses_user_rating_after_with_fallback` | Rating trend prefers `user_rating_after` and falls back to `user_rating_before`. |
+| `test_recent_games_derives_result_from_player_perspective` | Recent games list returns player-relative `WIN/LOSS/DRAW` and expected share-code payload. |
+| `test_returns_correct_aggregate_stats` | Blunder/mistake/inaccuracy averages and analysed count are aggregated correctly. |
+| `test_stats_can_be_filtered_by_timeframe_days` | `days` query filter scopes aggregates and trends to games on/after `now - days` (and `days=0` means all time). |
+| `test_stats_rejects_invalid_days_parameter` | Stats endpoint returns `422` when `days` is not one of the allowed values. |
+| `test_stats_can_be_filtered_by_game_type` | `game_type` query filter scopes stats aggregates to bullet/blitz/rapid/daily buckets. |
+| `test_games_endpoint_can_be_filtered_by_game_type` | Connected-account games endpoint respects `game_type` filtering for listed games. |
+| `test_analysed_counts_and_recommended_type_use_time_control_buckets` | `analysed_counts_by_type` buckets complete games by time control; `recommended_game_type` picks the largest bucket. |
+| `test_recommended_type_breaks_ties_in_fixed_order` | When two buckets tie for the max count, `recommended_game_type` uses a deterministic order (bullet, then blitz, then rapid, then daily). |
+
+---
+
+## Feature — `chess:sync-connected-account` and Chess.com archive sync
+
+**File:** [`Feature/SyncConnectedAccountCommandTest.php`](Feature/SyncConnectedAccountCommandTest.php)
+
+| Test | What it verifies |
+|------|------------------|
+| `test_full_archive_queues_all_games_across_months` | `SyncChessComAccountJob` with full archive walks every month and queues one `ImportExternalGameJob` per game. |
+| `test_recent_window_caps_at_twenty_from_newest_months` | Recent-window mode matches the web sync cap (20 games, newest months first). |
+| `test_command_requires_account_without_create` | Command fails when no `connected_accounts` row exists and `--create` is not passed. |
+| `test_command_create_option_inserts_row_and_dispatches_job` | `--create` upserts a row and dispatches the sync job to the queue. |
+
+---
+
+## Feature — analysis job behavior and command wiring
+
+**Files:** [`Feature/AnalyseGameJobTest.php`](Feature/AnalyseGameJobTest.php), [`Feature/AnalyseGameCommandTest.php`](Feature/AnalyseGameCommandTest.php), [`Feature/ReanalyseGamesCommandTest.php`](Feature/ReanalyseGamesCommandTest.php)
+
+| Test | What it verifies |
+|------|------------------|
+| `test_job_sets_game_complete_and_updates_move_and_engine_analysis` | Job writes move-level analysis (`cp_score`, `cp_loss`, `classification`), computes bounded ACPL-style accuracy, updates user-colour summary counters/status, and upserts engine analysis rows. |
+| `test_job_skips_complete_games_unless_forced` | Job exits early for already-complete games when not forced. |
+| `test_failed_marks_game_as_failed` | Job `failed()` hook marks game analysis status as failed. |
+| `test_command_dispatches_sync_analysis_job` | `chess:analyse` command dispatches `AnalyseGameJob` synchronously with expected arguments. |
+| `test_command_requires_scope_option` | `chess:reanalyse` requires explicit scope (`--all` or `--game_id`) to avoid accidental full reruns. |
+| `test_command_dispatches_sync_force_jobs_for_specific_game_ids` | `chess:reanalyse --game_id=...` dispatches forced sync analysis for each unique requested game ID. |
+| `test_command_with_all_dispatches_for_every_game` | `chess:reanalyse --all` dispatches forced sync analysis for every game in the database. |
+
+---
+
+## Feature — share-code generation and migration safeguards
+
+**Files:** [`Feature/ShareCodeGeneratorTest.php`](Feature/ShareCodeGeneratorTest.php), [`Feature/ShareCodeBackfillMigrationTest.php`](Feature/ShareCodeBackfillMigrationTest.php)
+
+| Test | What it verifies |
+|------|------------------|
+| `test_generate_returns_8_char_code_with_expected_alphabet` | Generated share code matches intended 8-char unambiguous alphabet. |
+| `test_generate_returns_unique_codes_across_many_calls` | Generator does not return duplicates across a representative batch. |
+| `test_backfill_migration_replaces_non_8_char_share_codes_postgres_only` | Backfill migration upgrades non-8-char share codes (Postgres-only path). |
 
 ---
 
@@ -73,6 +167,8 @@ Seeds a development user, submits a representative PGN-derived payload, and vali
 | `test_key_moments_same_rank_in_different_games_is_allowed` | Same key-moment rank in different games is valid. |
 | `test_key_moments_rank_check_constraint_postgres_only` | Postgres CHECK enforces key-moment rank range. |
 | `test_games_partial_unique_index_postgres_only` | Postgres partial unique index prevents duplicate external-import identity per user/source. |
+| `test_engine_analyses_move_id_and_engine_name_must_be_unique` | Duplicate analysis rows for the same `(move_id, engine_name)` are rejected. |
+| `test_engine_analyses_allows_same_move_for_different_engines` | Multi-engine analysis rows for a single move are allowed. |
 
 ### Cascade and nullable foreign keys
 
